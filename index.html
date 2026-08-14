@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autrum - Audio Lab</title>
+    <!-- Favicon independiente con la onda cuadrada exacta -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+    <!-- Importar FontAwesome para íconos sin necesidad de framework -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1><i class="fas fa-wave-square"></i> Autrum</h1>
+        <nav>
+            <button class="nav-btn active" id="nav-analizador"><i class="fas fa-chart-simple"></i> Analizador</button>
+            <button class="nav-btn" id="nav-reproductor"><i class="fas fa-play-circle"></i> Reproductor</button>
+            <button class="nav-btn" id="nav-comparador"><i class="fas fa-magnifying-glass-chart"></i> Comparador</button>
+        </nav>
+    </header>
+
+    <main id="main-content">
+        <!-- Sección del Analizador -->
+        <section id="section-analizador" class="active-section">
+            <h2>Analizador de Audio</h2>
+            
+            <div class="controls">
+                <!-- Panel de Streaming -->
+                <div class="control-group control-stream">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-stream"><i class="fas fa-tower-broadcast"></i> Streaming</span>
+                        <span class="mode-subtitle">Captura en vivo desde el micrófono</span>
+                    </div>
+                    <div class="btn-row">
+                        <button id="btn-iniciar-mic" class="btn btn-primary"><i class="fas fa-microphone"></i> Iniciar</button>
+                        <button id="btn-pausar-mic" class="btn btn-warning" disabled><i class="fas fa-pause"></i> Pausar</button>
+                        <button id="btn-detener-mic" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Finalizar</button>
+                    </div>
+                </div>
+                
+                <!-- Panel de Batch -->
+                <div class="control-group control-batch">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-batch"><i class="fas fa-file-audio"></i> Batch</span>
+                        <span class="mode-subtitle">Analiza un archivo WAV existente</span>
+                    </div>
+                    <div class="btn-row">
+                        <label class="btn btn-batch-upload" for="input-wav"><i class="fas fa-folder-open"></i> Cargar WAV</label>
+                        <input type="file" id="input-wav" accept="audio/wav" style="display:none">
+                        <button id="btn-pausar-wav" class="btn btn-warning" disabled><i class="fas fa-pause"></i> Pausar</button>
+                        <button id="btn-cancelar-wav" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Cancelar</button>
+                    </div>
+                    <div id="batch-status" class="batch-status" style="display:none">
+                        <i class="fas fa-circle-notch fa-spin"></i> <span id="batch-filename"></span>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="graphs-container">
+                <div class="graph-box">
+                    <h3><i class="fas fa-clock"></i> Dominio del Tiempo</h3>
+                    <canvas id="canvas-tiempo" width="600" height="200"></canvas>
+                </div>
+                <div class="graph-box">
+                    <h3><i class="fas fa-broadcast-tower"></i> Dominio de la Frecuencia (Fourier)</h3>
+                    <canvas id="canvas-frecuencia" width="600" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="export-container">
+                <button id="btn-exportar-atm" class="btn btn-success" disabled><i class="fas fa-file-export"></i> Exportar archivo .atm</button>
+            </div>
+        </section>
+
+        <!-- Sección del Reproductor (Oculta por defecto) -->
+        <section id="section-reproductor" style="display: none;">
+            <h2>Reproductor Autrum</h2>
+            <p>Próximamente...</p>
+        </section>
+
+        <!-- Sección del Comparador (Oculta por defecto) -->
+        <section id="section-comparador" style="display: none;">
+            <h2>Comparador de Voces</h2>
+            <p>Próximamente...</p>
+        </section>
+    </main>
+
+    <!-- Modal de Exportación -->
+    <div id="modal-exportar" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h3><i class="fas fa-file-export"></i> Exportar Archivo .atm</h3>
+            <p>Introduce un nombre para guardar tu análisis de audio:</p>
+            
+            <div class="modal-input-group">
+                <input type="text" id="input-filename" value="grabacion" placeholder="Nombre del archivo">
+                <span class="file-ext">.atm</span>
+            </div>
+
+            <div id="modal-loading" style="display: none;" class="loading-spinner">
+                <i class="fas fa-circle-notch fa-spin"></i> Generando archivo .atm...
+            </div>
+
+            <div class="modal-actions">
+                <button id="btn-cancelar-export" class="btn">Cancelar</button>
+                <button id="btn-confirmar-export" class="btn btn-success"><i class="fas fa-download"></i> Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts modularizados -->
+    <script src="js/app.js"></script>
+    <script src="js/analizador.js"></script>
+</body>
+</html>
