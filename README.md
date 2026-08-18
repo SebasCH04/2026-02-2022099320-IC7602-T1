@@ -1,5 +1,5 @@
 ﻿<div align="center">
-  <img src="favicon.svg" alt="Autrum Logo" width="100" />
+  <img src="Autrum/favicon.svg" alt="Autrum Logo" width="100" />
 
   # Autrum
 
