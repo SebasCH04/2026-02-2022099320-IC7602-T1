@@ -18,10 +18,10 @@
 
 ## Integrantes
 
-- Daniel de Jesús Alemán Ruiz | 2023051957 
-- Victor Aymerich Quesada |
+- Daniel de Jesús Alemán Ruiz | 2023051957 |
+- Victor Aymerich Quesada | 2023152436 |
 - José Julián Brenes Garro | 2022272865 |
-- Sebastián Calvo Hernández |
+- Sebastián Calvo Hernández | 2022099320 |
 - Emmanuel David Rodríguez Rivas | 2023146102 |
 - Sebastián Rodríguez Sánchez | 2023074446 |
 
