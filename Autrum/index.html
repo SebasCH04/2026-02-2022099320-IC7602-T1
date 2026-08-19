@@ -77,7 +77,56 @@
         <!-- Sección del Reproductor (Oculta por defecto) -->
         <section id="section-reproductor" style="display: none;">
             <h2>Reproductor Autrum</h2>
-            <p>Próximamente...</p>
+
+            <div class="controls">
+                <!-- Panel de carga y transporte -->
+                <div class="control-group control-stream">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-stream"><i class="fas fa-file-import"></i> Archivo .atm</span>
+                        <span class="mode-subtitle">Carga una sesión previamente exportada</span>
+                    </div>
+                    <div class="btn-row">
+                        <label class="btn btn-batch-upload" for="input-atm"><i class="fas fa-folder-open"></i> Cargar .atm</label>
+                        <input type="file" id="input-atm" accept=".atm" style="display:none">
+                        <button id="btn-play-atm" class="btn btn-primary" disabled><i class="fas fa-play"></i> Reproducir</button>
+                        <button id="btn-pausar-atm" class="btn btn-warning" disabled><i class="fas fa-pause"></i> Pausar</button>
+                        <button id="btn-detener-atm" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Detener</button>
+                    </div>
+                    <div id="atm-status" class="batch-status" style="display:none">
+                        <i class="fas fa-file-audio"></i> <span id="atm-filename"></span><span id="atm-meta"></span>
+                    </div>
+                </div>
+
+                <!-- Panel de zoom -->
+                <div class="control-group control-batch">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-batch"><i class="fas fa-magnifying-glass"></i> Zoom</span>
+                        <span class="mode-subtitle">Explora el dominio del tiempo con detalle</span>
+                    </div>
+                    <div class="btn-row">
+                        <button id="btn-zoom-in" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-plus"></i> Acercar</button>
+                        <button id="btn-zoom-out" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-minus"></i> Alejar</button>
+                        <button id="btn-zoom-reset" class="btn btn-warning" disabled><i class="fas fa-expand"></i> Ver todo</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="graphs-container">
+                <div class="graph-box">
+                    <h3><i class="fas fa-clock"></i> Dominio del Tiempo <span class="hint-text">(click: saltar · arrastrar: desplazar)</span></h3>
+                    <canvas id="canvas-reproductor-tiempo" width="600" height="200"></canvas>
+                </div>
+                <div class="graph-box">
+                    <h3><i class="fas fa-broadcast-tower"></i> Dominio de la Frecuencia (en vivo)</h3>
+                    <canvas id="canvas-reproductor-frecuencia" width="600" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="playback-progress">
+                <span id="tiempo-actual">00:00</span>
+                <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.1" disabled>
+                <span id="tiempo-total">00:00</span>
+            </div>
         </section>
 
         <!-- Sección del Comparador (Oculta por defecto) -->
@@ -112,5 +161,6 @@
     <!-- Scripts modularizados -->
     <script src="js/app.js"></script>
     <script src="js/analizador.js"></script>
+    <script src="js/reproductor.js"></script>
 </body>
 </html>
