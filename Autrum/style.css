@@ -114,6 +114,7 @@ h3 {
     gap: 2rem;
     margin-bottom: 2rem;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 .control-group {
