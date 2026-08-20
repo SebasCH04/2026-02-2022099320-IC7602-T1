@@ -245,6 +245,54 @@ canvas {
     margin-top: 1rem;
 }
 
+/* Reproductor */
+.hint-text {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    opacity: 0.7;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+#atm-meta {
+    color: var(--text-muted);
+    margin-left: 0.4rem;
+}
+
+.playback-progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 1rem 1.5rem;
+    backdrop-filter: blur(10px);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.playback-progress input[type="range"] {
+    flex: 1;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.playback-progress input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#canvas-reproductor-tiempo {
+    cursor: grab;
+}
+
+#canvas-reproductor-tiempo:active {
+    cursor: grabbing;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
