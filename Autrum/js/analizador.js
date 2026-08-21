@@ -12,15 +12,32 @@ const ctxTiempo = canvasTiempo.getContext('2d');
 const canvasFrecuencia = document.getElementById('canvas-frecuencia');
 const ctxFrecuencia = canvasFrecuencia.getContext('2d');
 
-// Ajustar las dimensiones del canvas al tamaño real en pantalla
-function ajustarCanvas() {
-    canvasTiempo.width = canvasTiempo.offsetWidth;
-    canvasTiempo.height = canvasTiempo.offsetHeight;
-    canvasFrecuencia.width = canvasFrecuencia.offsetWidth;
-    canvasFrecuencia.height = canvasFrecuencia.offsetHeight;
+// Se ajustan los canvas al arrancar y al cambiar el tamaño de la ventana.
+// Si no se está grabando pero hay un analizador activo, se redibuja el estado
+// actual para que la gráfica no se pierda al hacer zoom con el navegador.
+function ajustarCanvasAnalizador() {
+    ajustarCanvas(canvasTiempo);
+    ajustarCanvas(canvasFrecuencia);
+    
+    if (!isRecording) {
+        if (analyser) {
+            const bufferLength  = analyser.frequencyBinCount;
+            
+            const dataArrayTime = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArrayTime);
+            dibujarOndaTiempo(ctxTiempo, dataArrayTime, canvasTiempo.width, canvasTiempo.height);
+            
+            const dataArrayFreq = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArrayFreq);
+            dibujarEspectroFrecuencia(ctxFrecuencia, dataArrayFreq, canvasFrecuencia.width, canvasFrecuencia.height);
+        } else {
+            limpiarCanvas(ctxTiempo,      canvasTiempo.width,      canvasTiempo.height);
+            limpiarCanvas(ctxFrecuencia,  canvasFrecuencia.width,  canvasFrecuencia.height);
+        }
+    }
 }
-window.addEventListener('resize', ajustarCanvas);
-window.addEventListener('load', ajustarCanvas);
+window.addEventListener('resize', ajustarCanvasAnalizador);
+window.addEventListener('load',   ajustarCanvasAnalizador);
 
 // Referencias a Botones y UI
 const btnIniciar = document.getElementById('btn-iniciar-mic');
@@ -313,65 +330,25 @@ btnConfirmarExport.addEventListener('click', () => {
 
 function dibujarGraficos() {
     if (!isRecording) return;
-    
+
     animationId = requestAnimationFrame(dibujarGraficos);
 
-    // Primero, dibujar Dominio del Tiempo (Onda)
-    const bufferLength = analyser.frequencyBinCount;
+    const bufferLength  = analyser.frequencyBinCount;
+
+    // Se obtienen los datos del dominio del tiempo y se dibuja la onda.
     const dataArrayTime = new Uint8Array(bufferLength);
     analyser.getByteTimeDomainData(dataArrayTime);
+    dibujarOndaTiempo(ctxTiempo, dataArrayTime, canvasTiempo.width, canvasTiempo.height);
 
-    ctxTiempo.fillStyle = '#0f172a'; // Fondo
-    ctxTiempo.fillRect(0, 0, canvasTiempo.width, canvasTiempo.height);
-    
-    ctxTiempo.lineWidth = 2;
-    ctxTiempo.strokeStyle = '#3b82f6'; // Linea azul
-    ctxTiempo.beginPath();
-
-    const sliceWidth = canvasTiempo.width * 1.0 / bufferLength;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-        const v = dataArrayTime[i] / 128.0;
-        const y = v * canvasTiempo.height / 2;
-
-        if (i === 0) {
-            ctxTiempo.moveTo(x, y);
-        } else {
-            ctxTiempo.lineTo(x, y);
-        }
-        x += sliceWidth;
-    }
-    ctxTiempo.lineTo(canvasTiempo.width, canvasTiempo.height / 2);
-    ctxTiempo.stroke();
-
-    // Segundo, dibujar el Dominio de la Frecuencia (Fourier)
+    // Se obtienen los datos de frecuencia y se dibuja el espectro.
     const dataArrayFreq = new Uint8Array(bufferLength);
     analyser.getByteFrequencyData(dataArrayFreq);
-    
-    // Guardar una muestra cada cierto tiempo para el archivo .atm
-    if (Math.random() < 0.1) { // Guardar alrededor de 10% de los frames para no saturar la memoria
+    dibujarEspectroFrecuencia(ctxFrecuencia, dataArrayFreq, canvasFrecuencia.width, canvasFrecuencia.height);
+
+    // Se guarda exactamente el 10% de los frames de forma determinista (cada 10 frames).
+    dibujarGraficos.frameCount = (dibujarGraficos.frameCount || 0) + 1;
+    if (dibujarGraficos.frameCount % 10 === 0) {
         atmData.trazosFrecuencia.push(Array.from(dataArrayFreq));
     }
 
-    ctxFrecuencia.fillStyle = '#0f172a';
-    ctxFrecuencia.fillRect(0, 0, canvasFrecuencia.width, canvasFrecuencia.height);
-
-    const barWidth = (canvasFrecuencia.width / bufferLength) * 2.5;
-    let barHeight;
-    let xFreq = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-        barHeight = dataArrayFreq[i];
-
-        // Cambiar color basado en la altura
-        const r = barHeight + (25 * (i/bufferLength));
-        const g = 250 * (i/bufferLength);
-        const b = 50;
-
-        ctxFrecuencia.fillStyle = `rgb(${r},${g},${b})`;
-        ctxFrecuencia.fillRect(xFreq, canvasFrecuencia.height - barHeight / 2, barWidth, barHeight / 2);
-
-        xFreq += barWidth + 1;
-    }
 }

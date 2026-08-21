@@ -53,15 +53,26 @@ let reprMoved = false;
 let reprViewStart = 0;    // segundos
 let reprViewDuration = 0; // segundos visibles en pantalla
 
+// Se ajustan los canvas al arrancar y al cambiar el tamaño de la ventana.
+// Si hay un buffer cargado se vuelve a dibujar la onda.
+// Para la frecuencia, se lee el estado actual del analizador para no perder 
+// la gráfica si está en pausa.
 function ajustarCanvasReproductor() {
-    canvasReprTiempo.width = canvasReprTiempo.offsetWidth;
-    canvasReprTiempo.height = canvasReprTiempo.offsetHeight;
-    canvasReprFrecuencia.width = canvasReprFrecuencia.offsetWidth;
-    canvasReprFrecuencia.height = canvasReprFrecuencia.offsetHeight;
+    ajustarCanvas(canvasReprTiempo);
+    ajustarCanvas(canvasReprFrecuencia);
     dibujarOnda();
+    
+    if (reprAnalyser) {
+        const bufferLength = reprAnalyser.frequencyBinCount;
+        const datos = new Uint8Array(bufferLength);
+        reprAnalyser.getByteFrequencyData(datos);
+        dibujarEspectroFrecuencia(ctxReprFrecuencia, datos, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
+    } else {
+        limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
+    }
 }
 window.addEventListener('resize', ajustarCanvasReproductor);
-window.addEventListener('load', ajustarCanvasReproductor);
+window.addEventListener('load',   ajustarCanvasReproductor);
 
 function formatTime(segundos) {
     if (!isFinite(segundos) || segundos < 0) segundos = 0;
@@ -139,7 +150,7 @@ inputAtm.addEventListener('change', async (event) => {
         btnZoomReset.disabled = false;
 
         dibujarOnda();
-        limpiarFrecuencia();
+        limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
     } catch (err) {
         console.error('Error al procesar el archivo .atm:', err);
         alert('No se pudo decodificar el audio contenido en el archivo .atm.');
@@ -201,7 +212,7 @@ btnDetenerAtm.addEventListener('click', () => {
     btnDetenerAtm.disabled = true;
 
     dibujarOnda();
-    limpiarFrecuencia();
+    limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 });
 
 reprAudioEl.addEventListener('ended', () => {
@@ -210,7 +221,7 @@ reprAudioEl.addEventListener('ended', () => {
     btnPausarAtm.disabled = true;
     btnPausarAtm.innerHTML = '<i class="fas fa-pause"></i> Pausar';
     btnDetenerAtm.disabled = true;
-    limpiarFrecuencia();
+    limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 });
 
 function pausarReproduccion() {
@@ -230,45 +241,15 @@ seekBar.addEventListener('input', () => {
 // ============================================================
 
 function dibujarOnda() {
+    const w = canvasReprTiempo.width;
+    const h = canvasReprTiempo.height;
+
     if (!reprAudioBuffer) {
-        ctxReprTiempo.fillStyle = '#0f172a';
-        ctxReprTiempo.fillRect(0, 0, canvasReprTiempo.width, canvasReprTiempo.height);
+        limpiarCanvas(ctxReprTiempo, w, h);
         return;
     }
 
-    const datos = reprAudioBuffer.getChannelData(0); // canal 0
-    const sampleRate = reprAudioBuffer.sampleRate;
-    const w = canvasReprTiempo.width;
-    const h = canvasReprTiempo.height;
-    const mitad = h / 2;
-
-    const muestraInicio = Math.floor(reprViewStart * sampleRate);
-    const muestraFin = Math.min(datos.length, Math.floor((reprViewStart + reprViewDuration) * sampleRate));
-    const muestrasPorPixel = Math.max(1, Math.floor((muestraFin - muestraInicio) / w));
-
-    ctxReprTiempo.fillStyle = '#0f172a';
-    ctxReprTiempo.fillRect(0, 0, w, h);
-
-    ctxReprTiempo.strokeStyle = '#3b82f6';
-    ctxReprTiempo.lineWidth = 1;
-    ctxReprTiempo.beginPath();
-
-    for (let x = 0; x < w; x++) {
-        const inicio = muestraInicio + x * muestrasPorPixel;
-        let min = 1.0, max = -1.0;
-        for (let j = 0; j < muestrasPorPixel; j++) {
-            const idx = inicio + j;
-            if (idx >= datos.length) break;
-            const v = datos[idx];
-            if (v < min) min = v;
-            if (v > max) max = v;
-        }
-        if (min > max) { min = 0; max = 0; }
-        ctxReprTiempo.moveTo(x, mitad + min * mitad);
-        ctxReprTiempo.lineTo(x, mitad + max * mitad);
-    }
-    ctxReprTiempo.stroke();
-
+    dibujarOndaBuffer(ctxReprTiempo, reprAudioBuffer, w, h, reprViewStart, reprViewDuration);
     dibujarPlayhead();
 }
 
@@ -352,9 +333,8 @@ window.addEventListener('mouseup', (e) => {
 // 4. DOMINIO DE LA FRECUENCIA — espectro en vivo durante playback
 // ============================================================
 
-function limpiarFrecuencia() {
-    ctxReprFrecuencia.fillStyle = '#0f172a';
-    ctxReprFrecuencia.fillRect(0, 0, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
+function limpiarFrecuenciRepr() {
+    limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 }
 
 function dibujarFrecuencia() {
@@ -362,22 +342,7 @@ function dibujarFrecuencia() {
     const bufferLength = reprAnalyser.frequencyBinCount;
     const datos = new Uint8Array(bufferLength);
     reprAnalyser.getByteFrequencyData(datos);
-
-    ctxReprFrecuencia.fillStyle = '#0f172a';
-    ctxReprFrecuencia.fillRect(0, 0, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
-
-    const barWidth = (canvasReprFrecuencia.width / bufferLength) * 2.5;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-        const barHeight = datos[i];
-        const r = barHeight + (25 * (i / bufferLength));
-        const g = 250 * (i / bufferLength);
-        const b = 50;
-        ctxReprFrecuencia.fillStyle = `rgb(${r},${g},${b})`;
-        ctxReprFrecuencia.fillRect(x, canvasReprFrecuencia.height - barHeight / 2, barWidth, barHeight / 2);
-        x += barWidth + 1;
-    }
+    dibujarEspectroFrecuencia(ctxReprFrecuencia, datos, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 }
 
 // ============================================================
