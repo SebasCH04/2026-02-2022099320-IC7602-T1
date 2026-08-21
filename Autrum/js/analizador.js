@@ -345,8 +345,10 @@ function dibujarGraficos() {
     analyser.getByteFrequencyData(dataArrayFreq);
     dibujarEspectroFrecuencia(ctxFrecuencia, dataArrayFreq, canvasFrecuencia.width, canvasFrecuencia.height);
 
-    // Se guarda aproximadamente el 10% de los frames para no saturar la memoria.
-    if (Math.random() < 0.1) {
+    // Se guarda exactamente el 10% de los frames de forma determinista (cada 10 frames).
+    dibujarGraficos.frameCount = (dibujarGraficos.frameCount || 0) + 1;
+    if (dibujarGraficos.frameCount % 10 === 0) {
         atmData.trazosFrecuencia.push(Array.from(dataArrayFreq));
     }
+
 }
