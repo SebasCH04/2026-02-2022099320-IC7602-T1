@@ -129,10 +129,56 @@
             </div>
         </section>
 
-        <!-- Sección del Comparador (Oculta por defecto) -->
+        <!-- Sección del Comparador -->
         <section id="section-comparador" style="display: none;">
             <h2>Comparador de Voces</h2>
-            <p>Próximamente...</p>
+
+            <div class="controls">
+                <!-- Panel de referencia: grabación en vivo por micrófono -->
+                <div class="control-group control-stream">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-stream"><i class="fas fa-microphone"></i> Referencia</span>
+                        <span class="mode-subtitle">Pronuncia la palabra o frase a buscar</span>
+                    </div>
+                    <div class="btn-row">
+                        <button id="btn-grabar-ref" class="btn btn-primary"><i class="fas fa-microphone"></i> Grabar referencia</button>
+                        <button id="btn-detener-ref" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Detener</button>
+                        <button id="btn-play-ref" class="btn btn-warning" disabled><i class="fas fa-play"></i> Reproducir referencia</button>
+                    </div>
+                    <div id="ref-status" class="batch-status" style="display:none">
+                        <i class="fas fa-circle-notch fa-spin"></i> <span id="ref-info">Grabando...</span>
+                    </div>
+                </div>
+
+                <!-- Panel candidato: archivo .atm previamente generado -->
+                <div class="control-group control-batch">
+                    <div class="control-group-header">
+                        <span class="mode-badge badge-batch"><i class="fas fa-file-audio"></i> Candidato</span>
+                        <span class="mode-subtitle">Archivo .atm donde buscar la frase</span>
+                    </div>
+                    <div class="btn-row">
+                        <label class="btn btn-batch-upload" for="input-atm-cand"><i class="fas fa-folder-open"></i> Cargar .atm</label>
+                        <input type="file" id="input-atm-cand" accept=".atm" style="display:none">
+                    </div>
+                    <div id="cand-status" class="batch-status" style="display:none">
+                        <i class="fas fa-file-audio"></i> <span id="cand-filename"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="export-container" style="margin-bottom: 1.5rem;">
+                <button id="btn-comparar" class="btn btn-success" disabled>
+                    <i class="fas fa-magnifying-glass"></i> Comparar
+                </button>
+            </div>
+
+            <div class="playback-progress">
+                <span><i class="fas fa-percent"></i> Confianza: <strong id="compar-confianza">—</strong></span>
+                <span><i class="fas fa-clock"></i> Ubicación: <strong id="compar-tiempo-match">—</strong></span>
+                <button id="btn-play-match" class="btn btn-primary" disabled style="margin-left: auto;">
+                    <i class="fas fa-play"></i> Reproducir coincidencia
+                </button>
+            </div>
         </section>
     </main>
 
@@ -163,5 +209,6 @@
     <script src="js/app.js"></script>
     <script src="js/analizador.js"></script>
     <script src="js/reproductor.js"></script>
+    <script src="js/comparador.js"></script>
 </body>
 </html>
