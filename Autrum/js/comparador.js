@@ -1,4 +1,4 @@
-// AUTRUM — COMPARADOR (etapa 1: armónicos)
+// AUTRUM — COMPARADOR (armonicos y potencia)
 
 const btnGrabarRef = document.getElementById('btn-grabar-ref');
 const btnDetenerRef = document.getElementById('btn-detener-ref');
@@ -16,7 +16,7 @@ const comparConfianza = document.getElementById('compar-confianza');
 const comparTiempoMatch = document.getElementById('compar-tiempo-match');
 
 // --- Estado de la referencia (mic en vivo) ---
-let comparRefFrames = [];          // espectros ya recortados de silencio: [Array(1024), ...]
+let comparRefFrames = [];          // muestras { timestamp, datos, potencia }, sin silencio externo
 let comparAudioContext = null;
 let comparAnalyser = null;
 let comparMicrophone = null;
@@ -27,10 +27,11 @@ let comparFrameCount = 0;          // contador propio para el submuestreo 1/10, 
 let comparRefMediaRecorder = null;
 let comparRefChunks = [];
 let comparRefAudioEl = null;       // <audio> de la referencia grabada, para reproducir
+let comparRefInicioMs = 0;
 
 // --- Estado del candidato (.atm subido) ---
 let comparCand = null;             // { nombre, frames, duracion, audioEl }
-let comparResultado = null;        // { offset, confianza, tInicioSeg, tFinSeg, framesInput }
+let comparResultado = null;        // resultado combinado de armonicos y potencia
 
 // 0. HELPERS COMPARTIDOS DENTRO DEL MÓDULO
 
@@ -63,6 +64,35 @@ function formatTiempoPreciso(segundos) { // Formatea segundos como mm:ss.s (con 
     const m = Math.floor(segundos / 60);
     const s = (segundos % 60).toFixed(1);
     return `${String(m).padStart(2, '0')}:${s.padStart(4, '0')}`;
+}
+
+function clampComparador(valor, minimo = 0, maximo = 1) {
+    return Math.min(Math.max(valor, minimo), maximo);
+}
+
+// Media de cuadrados de las muestras temporales (RMS^2), es la misma metrica
+// utilizada por analizador.js al crear los archivos .atm version 2
+function calcularPotenciaTemporalComparador(muestras) {
+    if (!muestras.length) return 0;
+
+    let sumaCuadrados = 0;
+    for (const muestra of muestras) {
+        sumaCuadrados += muestra * muestra;
+    }
+    return sumaCuadrados / muestras.length;
+}
+
+// Compatibilidad con archivos .atm antiguos que solo guardaban el espectro
+// byte. No es potencia fisica, se usa unicamente como aproximacion
+function estimarPotenciaDesdeEspectro(datos) {
+    if (!datos.length) return 0;
+
+    let sumaCuadrados = 0;
+    for (const magnitud of datos) {
+        const normalizada = magnitud / 255;
+        sumaCuadrados += normalizada * normalizada;
+    }
+    return sumaCuadrados / datos.length;
 }
 
 // 1. CAPTURA DE LA REFERENCIA POR MICRÓFONO
@@ -98,6 +128,7 @@ btnGrabarRef.addEventListener('click', async () => {
 
         comparRefFrames = [];
         comparFrameCount = 0;
+        comparRefInicioMs = performance.now();
         comparGrabando = true;
 
         actualizarUIGrabacion(true);
@@ -120,7 +151,14 @@ function capturarFramesReferencia() {
     // Mismo criterio de submuestreo que analizador.js: 1 de cada 10 frames de animación. 
     comparFrameCount++;
     if (comparFrameCount % 10 === 0) {
-        comparRefFrames.push(Array.from(dataArrayFreq));
+        const dataArrayPotencia = new Float32Array(comparAnalyser.fftSize);
+        comparAnalyser.getFloatTimeDomainData(dataArrayPotencia);
+
+        comparRefFrames.push({
+            timestamp: (performance.now() - comparRefInicioMs) / 1000,
+            datos: Array.from(dataArrayFreq),
+            potencia: calcularPotenciaTemporalComparador(dataArrayPotencia)
+        });
     }
 }
 
@@ -157,10 +195,12 @@ btnPlayRef.addEventListener('click', () => {
 
 // 2. RECORTE DE SILENCIO
 
-// Energía de un frame = suma de todas sus magnitudes de frecuencia.
-// Silencio → suma baja. Voz → suma alta.
+// Para los .atm nuevos se usa potencia temporal real, el fallback conserva
+// compatibilidad con muestras antiguas que no poseen el campo de potencia.
 function energiaFrame(frame) {
-    return frame.reduce((suma, v) => suma + v, 0);
+    return Number.isFinite(frame.potencia)
+        ? frame.potencia
+        : estimarPotenciaDesdeEspectro(frame.datos || frame);
 }
 
 // Recorta los frames de silencio al inicio y al final de la referencia,
@@ -198,8 +238,6 @@ async function cargarAtmComparador(archivo) {
     if (!atmJSON.audioBase64) {
         throw new Error('El .atm no contiene audio ("audioBase64" ausente).');
     }
-    // El .atm de analizador.js guarda trazosFrecuencia como array plano (sin timestamp). 
-    const frames = atmJSON.frecuencias.map(f => Array.isArray(f) ? f : f.datos);
     // Se decodifica el audio dos veces con propósitos distintos:
     // - audioBuffer: para obtener la duración exacta (necesaria para convertir "índice de frame" a "segundos").
     // - audioEl: elemento <audio> real, para poder reproducir con play/pause/currentTime de forma simple.
@@ -209,6 +247,25 @@ async function cargarAtmComparador(archivo) {
     const ctxTemp = new (window.AudioContext || window.webkitAudioContext)();
     const audioBuffer = await ctxTemp.decodeAudioData(arrayBuffer.slice(0));
     ctxTemp.close();
+
+    const cantidadFrames = atmJSON.frecuencias.length;
+    const intervaloEstimado = audioBuffer.duration / cantidadFrames;
+    const frames = atmJSON.frecuencias.map((frame, indice) => {
+        const datos = Array.isArray(frame) ? frame : frame.datos;
+        if (!Array.isArray(datos) || datos.length === 0) {
+            throw new Error(`La muestra de frecuencia ${indice} no contiene datos válidos.`);
+        }
+
+        return {
+            datos,
+            potencia: Number.isFinite(frame?.potencia)
+                ? frame.potencia
+                : estimarPotenciaDesdeEspectro(datos),
+            timestamp: Number.isFinite(frame?.timestamp)
+                ? frame.timestamp
+                : indice * intervaloEstimado
+        };
+    });
 
     return {
         nombre: atmJSON.metadata?.nombre || archivo.name,
@@ -261,40 +318,112 @@ function similitudCoseno(a, b) {
     return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
-// Ventana deslizante: recorre cada posición posible donde la referencia
-// podría encajar dentro del candidato, comparando frame a frame en cada
-// posición, y se queda con la de mayor similitud promedio.
-function compararArmonicos(refFrames, candFrames, duracionCand) {
+function similitudArmonicaVentana(refFrames, candFrames, offset) {
+    let suma = 0;
+    for (let i = 0; i < refFrames.length; i++) {
+        suma += similitudCoseno(refFrames[i].datos, candFrames[offset + i].datos);
+    }
+    return suma / refFrames.length;
+}
+
+// Convierte una curva de potencia a dB y la estandariza, al retirar media y
+// escala se compara la forma temporal, no el volumen absoluto del microfono
+function normalizarCurvaPotencia(frames) {
+    const epsilon = 1e-12;
+    const valoresDb = frames.map(frame => 10 * Math.log10(Math.max(frame.potencia, epsilon)));
+    const media = valoresDb.reduce((suma, valor) => suma + valor, 0) / valoresDb.length;
+    const varianza = valoresDb.reduce((suma, valor) => suma + (valor - media) ** 2, 0) / valoresDb.length;
+    const desviacion = Math.sqrt(varianza);
+
+    if (desviacion < 1e-9) return valoresDb.map(() => 0);
+    return valoresDb.map(valor => (valor - media) / desviacion);
+}
+
+function similitudPotencia(refFrames, candFrames, offset) {
+    const curvaRef = normalizarCurvaPotencia(refFrames);
+    const ventanaCand = candFrames.slice(offset, offset + refFrames.length);
+    const curvaCand = normalizarCurvaPotencia(ventanaCand);
+
+    let producto = 0;
+    let magnitudRef = 0;
+    let magnitudCand = 0;
+    for (let i = 0; i < curvaRef.length; i++) {
+        producto += curvaRef[i] * curvaCand[i];
+        magnitudRef += curvaRef[i] * curvaRef[i];
+        magnitudCand += curvaCand[i] * curvaCand[i];
+    }
+
+    if (magnitudRef === 0 || magnitudCand === 0) return 0;
+    const correlacion = producto / Math.sqrt(magnitudRef * magnitudCand);
+    return clampComparador((correlacion + 1) / 2);
+}
+
+function seleccionarCandidatosDistintos(resultados, cantidad, separacionMinima) {
+    const seleccionados = [];
+    for (const resultado of resultados) {
+        const estaSeparado = seleccionados.every(
+            seleccionado => Math.abs(seleccionado.offset - resultado.offset) >= separacionMinima
+        );
+        if (estaSeparado) seleccionados.push(resultado);
+        if (seleccionados.length === cantidad) break;
+    }
+    return seleccionados;
+}
+
+// Primero, ventana deslizante por armonicos, luego, seleccion de candidatos,
+//  despues, validacion por potencia y por ultimo calculo de confianza
+function compararDosEtapas(refFrames, candFrames, duracionCand) {
     const framesInput = refFrames.length;
     const framesCand = candFrames.length;
     const maxOffset = framesCand - framesInput;
 
-    let mejorOffset = 0;
-    let mejorScore = -Infinity;
+    const resultadosArmonicos = [];
 
     for (let offset = 0; offset <= maxOffset; offset++) {
-        let suma = 0;
-        for (let i = 0; i < framesInput; i++) {
-            suma += similitudCoseno(refFrames[i], candFrames[offset + i]);
-        }
-        const promedio = suma / framesInput;
-        if (promedio > mejorScore) {
-            mejorScore = promedio;
-            mejorOffset = offset;
-        }
+        resultadosArmonicos.push({
+            offset,
+            similitudArmonica: similitudArmonicaVentana(refFrames, candFrames, offset)
+        });
     }
 
-    // Conversión de índice de frame a segundos: se asume que los frames
-    // están repartidos uniformemente a lo largo de la duración total del
-    // candidato (válido porque el submuestreo 1/10 es constante).
-    const segPorFrame = duracionCand / framesCand;
-    const tInicioSeg = mejorOffset * segPorFrame;
-    const ultimoFrame = Math.min(mejorOffset + framesInput - 1, framesCand - 1);
-    const tFinSeg = ultimoFrame * segPorFrame;
+    resultadosArmonicos.sort((a, b) => b.similitudArmonica - a.similitudArmonica);
+
+    // Etapa 1, conservar varias ubicaciones armonicamente prometedoras y
+    // suficientemente separadas para evitar elegir diez offsets adyacentes.
+    const candidatos = seleccionarCandidatosDistintos(
+        resultadosArmonicos,
+        Math.min(10, resultadosArmonicos.length),
+        Math.max(1, Math.floor(framesInput / 2))
+    );
+
+    // Etapa 2, comparar la curva de potencia y combinar ambos criterios.
+    for (const candidato of candidatos) {
+        candidato.similitudPotencia = similitudPotencia(refFrames, candFrames, candidato.offset);
+        candidato.puntuacion = (0.7 * candidato.similitudArmonica) + (0.3 * candidato.similitudPotencia);
+    }
+    candidatos.sort((a, b) => b.puntuacion - a.puntuacion);
+
+    const mejor = candidatos[0];
+    const segundo = candidatos[1];
+    const segundoScore = segundo?.puntuacion ?? 0;
+    const margen = clampComparador(
+        (mejor.puntuacion - segundoScore) / Math.max(1 - segundoScore, 1e-9)
+    );
+    const confianza = 100 * clampComparador((0.85 * mejor.puntuacion) + (0.15 * margen));
+
+    const segPorFrameEstimado = duracionCand / framesCand;
+    const tInicioSeg = candFrames[mejor.offset].timestamp;
+    const ultimoFrame = Math.min(mejor.offset + framesInput - 1, framesCand - 1);
+    const tFinSeg = Math.min(
+        duracionCand,
+        candFrames[ultimoFrame].timestamp + segPorFrameEstimado
+    );
 
     return {
-        offset: mejorOffset,
-        confianza: 0, //PENDIENTE
+        offset: mejor.offset,
+        confianza,
+        similitudArmonica: mejor.similitudArmonica,
+        similitudPotencia: mejor.similitudPotencia,
         tInicioSeg,
         tFinSeg,
         framesInput
@@ -302,7 +431,8 @@ function compararArmonicos(refFrames, candFrames, duracionCand) {
 }
 
 btnComparar.addEventListener('click', () => {
-    comparResultado = compararArmonicos(comparRefFrames, comparCand.frames, comparCand.duracion);
+    comparResultado = compararDosEtapas(comparRefFrames, comparCand.frames, comparCand.duracion);
+    comparConfianza.textContent = `${comparResultado.confianza.toFixed(1)}%`;
     comparTiempoMatch.textContent =
         `${formatTiempoPreciso(comparResultado.tInicioSeg)} — ${formatTiempoPreciso(comparResultado.tFinSeg)}`;
 

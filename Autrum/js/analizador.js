@@ -5,6 +5,9 @@ let isRecording = false;
 let animationId;
 let mediaRecorder;
 let recordedChunks = [];
+let capturaInicioMs = 0;
+let capturaPausaInicioMs = null;
+let capturaPausadaAcumuladaMs = 0;
 
 // Referencias a los Canvas
 const canvasTiempo = document.getElementById('canvas-tiempo');
@@ -66,8 +69,47 @@ function toggleModo(modo, activo) {
 // Estructura para guardar datos (para el .atm)
 let atmData = {
     audioOriginal: null, // Aqui se guarda el Blob si se quiere grabar
-    trazosFrecuencia: [] // Aqui se guarda las muestras de FFT
+    trazosFrecuencia: [] // Muestras { timestamp, datos, potencia }
 };
+
+// La potencia se calcula en el dominio del tiempo como la media de los
+// cuadrados de las muestras normalizadas, esta metrica equivale a RMS^2 y es
+// comparable entre el analizador y el comparador cuando ambos usan el mismo
+// fftSize y la misma API de captura.
+function calcularPotenciaTemporalAnalizador(muestras) {
+    if (!muestras.length) return 0;
+
+    let sumaCuadrados = 0;
+    for (const muestra of muestras) {
+        sumaCuadrados += muestra * muestra;
+    }
+    return sumaCuadrados / muestras.length;
+}
+
+function reiniciarRelojCaptura() {
+    capturaInicioMs = performance.now();
+    capturaPausaInicioMs = null;
+    capturaPausadaAcumuladaMs = 0;
+}
+
+function pausarRelojCaptura() {
+    if (capturaPausaInicioMs === null) {
+        capturaPausaInicioMs = performance.now();
+    }
+}
+
+function reanudarRelojCaptura() {
+    if (capturaPausaInicioMs !== null) {
+        capturaPausadaAcumuladaMs += performance.now() - capturaPausaInicioMs;
+        capturaPausaInicioMs = null;
+    }
+}
+
+function obtenerTiempoCapturaSegundos() {
+    const ahoraMs = capturaPausaInicioMs ?? performance.now();
+    const tiempoActivoMs = ahoraMs - capturaInicioMs - capturaPausadaAcumuladaMs;
+    return Math.max(0, tiempoActivoMs / 1000);
+}
 
 // Iniciar Captura de Micrófono
 btnIniciar.addEventListener('click', async () => {
@@ -110,6 +152,8 @@ btnIniciar.addEventListener('click', async () => {
         toggleModo('streaming', true);
         
         atmData.trazosFrecuencia = []; // Reiniciar datos
+        dibujarGraficos.frameCount = 0;
+        reiniciarRelojCaptura();
         
         dibujarGraficos();
     } catch (err) {
@@ -124,10 +168,12 @@ btnPausar.addEventListener('click', () => {
         isRecording = false;
         btnPausar.innerHTML = '<i class="fas fa-play"></i> Continuar';
         cancelAnimationFrame(animationId);
+        pausarRelojCaptura();
         if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.pause();
     } else {
         isRecording = true;
         btnPausar.innerHTML = '<i class="fas fa-pause"></i> Pausar';
+        reanudarRelojCaptura();
         if (mediaRecorder && mediaRecorder.state === 'paused') mediaRecorder.resume();
         dibujarGraficos();
     }
@@ -196,6 +242,8 @@ inputWav.addEventListener('change', async (event) => {
     // Guardar el Blob original para el .atm
     atmData.audioOriginal = archivo;
     atmData.trazosFrecuencia = [];
+    dibujarGraficos.frameCount = 0;
+    reiniciarRelojCaptura();
 
     // Actualizar UI
     isRecording = true;
@@ -231,10 +279,12 @@ btnPausarWav.addEventListener('click', async () => {
         await audioContext.suspend();
         isRecording = false;
         cancelAnimationFrame(animationId);
+        pausarRelojCaptura();
         btnPausarWav.innerHTML = '<i class="fas fa-play"></i> Reanudar';
     } else if (audioContext.state === 'suspended') {
         await audioContext.resume();
         isRecording = true;
+        reanudarRelojCaptura();
         btnPausarWav.innerHTML = '<i class="fas fa-pause"></i> Pausar';
         dibujarGraficos();
     }
@@ -307,7 +357,11 @@ btnConfirmarExport.addEventListener('click', () => {
                 metadata: {
                     nombre: nombreArchivo,
                     fecha: new Date().toISOString(),
-                    muestrasFrecuencia: atmData.trazosFrecuencia.length
+                    muestrasFrecuencia: atmData.trazosFrecuencia.length,
+                    versionFormato: 2,
+                    fftSize: analyser?.fftSize || 2048,
+                    sampleRate: audioContext?.sampleRate || null,
+                    metricaPotencia: 'media-cuadratica-dominio-tiempo'
                 },
                 frecuencias: atmData.trazosFrecuencia,
                 audioBase64: reader.result
@@ -348,7 +402,14 @@ function dibujarGraficos() {
     // Se guarda exactamente el 10% de los frames de forma determinista (cada 10 frames).
     dibujarGraficos.frameCount = (dibujarGraficos.frameCount || 0) + 1;
     if (dibujarGraficos.frameCount % 10 === 0) {
-        atmData.trazosFrecuencia.push(Array.from(dataArrayFreq));
+        const dataArrayPotencia = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(dataArrayPotencia);
+
+        atmData.trazosFrecuencia.push({
+            timestamp: obtenerTiempoCapturaSegundos(),
+            datos: Array.from(dataArrayFreq),
+            potencia: calcularPotenciaTemporalAnalizador(dataArrayPotencia)
+        });
     }
 
 }
