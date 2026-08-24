@@ -1,9 +1,4 @@
-// ============================================================
 // AUTRUM — COMPARADOR (etapa 1: armónicos)
-//
-// Prefijo "compar" en todo para no chocar con otros módulos, ya
-// que todos los scripts comparten el mismo scope global.
-// ============================================================
 
 const btnGrabarRef = document.getElementById('btn-grabar-ref');
 const btnDetenerRef = document.getElementById('btn-detener-ref');
@@ -17,50 +12,60 @@ const candFilename = document.getElementById('cand-filename');
 
 const btnComparar = document.getElementById('btn-comparar');
 const btnPlayMatch = document.getElementById('btn-play-match');
+const comparConfianza = document.getElementById('compar-confianza');
 const comparTiempoMatch = document.getElementById('compar-tiempo-match');
 
 // --- Estado de la referencia (mic en vivo) ---
-let comparRefFrames = [];
+let comparRefFrames = [];          // espectros ya recortados de silencio: [Array(1024), ...]
 let comparAudioContext = null;
 let comparAnalyser = null;
 let comparMicrophone = null;
 let comparStream = null;
 let comparGrabando = false;
 let comparAnimationId = null;
-let comparFrameCount = 0;
+let comparFrameCount = 0;          // contador propio para el submuestreo 1/10, igual que analizador.js
 let comparRefMediaRecorder = null;
 let comparRefChunks = [];
-let comparRefAudioEl = null;
+let comparRefAudioEl = null;       // <audio> de la referencia grabada, para reproducir
 
 // --- Estado del candidato (.atm subido) ---
-let comparCand = null;
-let comparResultado = null;
+let comparCand = null;             // { nombre, frames, duracion, audioEl }
+let comparResultado = null;        // { offset, confianza, tInicioSeg, tFinSeg, framesInput }
 
-// --- Helpers ---
-function crearAudioDesdeBlob(blob) {
-    return new Audio(URL.createObjectURL(blob));
+// 0. HELPERS COMPARTIDOS DENTRO DEL MÓDULO
+
+function crearAudioDesdeBlob(blob) { // Crea un <audio> reproducible a partir de un Blob.
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.preload = 'auto';
+    return audio;
 }
-function liberarAudio(audioEl) {
+
+function liberarAudio(audioEl) { // Pausa y libera la URL de un <audio> creado con crearAudioDesdeBlob, si existe. 
     if (!audioEl) return;
     audioEl.pause();
     URL.revokeObjectURL(audioEl.src);
 }
-function actualizarUIGrabacion(grabando) {
+
+function actualizarUIGrabacion(grabando) { // Habilita/deshabilita los controles relacionados con la grabación de la referencia.
     btnGrabarRef.disabled = grabando;
     btnDetenerRef.disabled = !grabando;
-    if (grabando) btnPlayRef.disabled = btnComparar.disabled = btnPlayMatch.disabled = true;
+
+    if (grabando) { // Mientras se graba una nueva referencia, cualquier resultado de comparación previo deja de tener sentido.
+        btnPlayRef.disabled = true;
+        btnComparar.disabled = true;
+        btnPlayMatch.disabled = true;
+    }
     refStatus.style.display = grabando ? 'flex' : 'none';
 }
-function formatTiempoPreciso(segundos) {
+
+function formatTiempoPreciso(segundos) { // Formatea segundos como mm:ss.s (con un decimal).
     if (!isFinite(segundos) || segundos < 0) segundos = 0;
     const m = Math.floor(segundos / 60);
     const s = (segundos % 60).toFixed(1);
     return `${String(m).padStart(2, '0')}:${s.padStart(4, '0')}`;
 }
 
-// ============================================================
 // 1. CAPTURA DE LA REFERENCIA POR MICRÓFONO
-// ============================================================
 btnGrabarRef.addEventListener('click', async () => {
     try {
         if (!comparAudioContext) {
@@ -72,12 +77,13 @@ btnGrabarRef.addEventListener('click', async () => {
 
         comparStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
+        // --- Análisis de frecuencia (para comparar) ---
         comparAnalyser = comparAudioContext.createAnalyser();
-        comparAnalyser.fftSize = 2048;
-
+        comparAnalyser.fftSize = 2048; // mismo valor que analizador.js: los espectros deben ser comparables
         comparMicrophone = comparAudioContext.createMediaStreamSource(comparStream);
         comparMicrophone.connect(comparAnalyser);
-
+        // No se conecta a destination: evita feedback/eco mientras se graba
+        // --- Grabación del audio real (para poder reproducirlo después) ---
         comparRefChunks = [];
         comparRefMediaRecorder = new MediaRecorder(comparStream);
         comparRefMediaRecorder.ondataavailable = (e) => {
@@ -96,7 +102,6 @@ btnGrabarRef.addEventListener('click', async () => {
 
         actualizarUIGrabacion(true);
         refInfo.textContent = 'Grabando... pronuncia la palabra o frase';
-
         capturarFramesReferencia();
     } catch (err) {
         console.error('Error al acceder al micrófono:', err);
@@ -112,6 +117,7 @@ function capturarFramesReferencia() {
     const dataArrayFreq = new Uint8Array(bufferLength);
     comparAnalyser.getByteFrequencyData(dataArrayFreq);
 
+    // Mismo criterio de submuestreo que analizador.js: 1 de cada 10 frames de animación. 
     comparFrameCount++;
     if (comparFrameCount % 10 === 0) {
         comparRefFrames.push(Array.from(dataArrayFreq));
@@ -121,7 +127,6 @@ function capturarFramesReferencia() {
 btnDetenerRef.addEventListener('click', () => {
     comparGrabando = false;
     cancelAnimationFrame(comparAnimationId);
-
     if (comparRefMediaRecorder && comparRefMediaRecorder.state !== 'inactive') {
         comparRefMediaRecorder.stop();
     }
@@ -135,13 +140,12 @@ btnDetenerRef.addEventListener('click', () => {
     }
 
     actualizarUIGrabacion(false);
-
+    // Se descartan los frames de silencio al inicio/fin
     const framesOriginales = comparRefFrames.length;
     comparRefFrames = recortarSilencio(comparRefFrames);
 
     refInfo.textContent =
         `Referencia lista — ${comparRefFrames.length} frames útiles (de ${framesOriginales} capturados)`;
-
     actualizarBotonComparar();
 });
 
@@ -151,13 +155,18 @@ btnPlayRef.addEventListener('click', () => {
     comparRefAudioEl.play();
 });
 
-// ============================================================
 // 2. RECORTE DE SILENCIO
-// ============================================================
+
+// Energía de un frame = suma de todas sus magnitudes de frecuencia.
+// Silencio → suma baja. Voz → suma alta.
 function energiaFrame(frame) {
     return frame.reduce((suma, v) => suma + v, 0);
 }
 
+// Recorta los frames de silencio al inicio y al final de la referencia,
+// dejando solo el tramo con voz real. El umbral es relativo al pico máximo
+// de ESA MISMA grabación (no un número fijo), porque el volumen absoluto
+// varía mucho según el micrófono y la persona.
 function recortarSilencio(frames, factorUmbral = 0.15) {
     if (frames.length === 0) return frames;
 
@@ -171,14 +180,14 @@ function recortarSilencio(frames, factorUmbral = 0.15) {
     let fin = frames.length - 1;
     while (fin > inicio && energias[fin] < umbral) fin--;
 
+    // Si toda la grabación fue "silencio" (nunca superó el umbral), se
+    // devuelve sin recortar en vez de un array vacío.
     if (inicio >= fin) return frames;
 
     return frames.slice(inicio, fin + 1);
 }
 
-// ============================================================
 // 3. CARGA DEL CANDIDATO (.atm)
-// ============================================================
 async function cargarAtmComparador(archivo) {
     const texto = await archivo.text();
     const atmJSON = JSON.parse(texto);
@@ -189,9 +198,11 @@ async function cargarAtmComparador(archivo) {
     if (!atmJSON.audioBase64) {
         throw new Error('El .atm no contiene audio ("audioBase64" ausente).');
     }
-
+    // El .atm de analizador.js guarda trazosFrecuencia como array plano (sin timestamp). 
     const frames = atmJSON.frecuencias.map(f => Array.isArray(f) ? f : f.datos);
-
+    // Se decodifica el audio dos veces con propósitos distintos:
+    // - audioBuffer: para obtener la duración exacta (necesaria para convertir "índice de frame" a "segundos").
+    // - audioEl: elemento <audio> real, para poder reproducir con play/pause/currentTime de forma simple.
     const respuesta = await fetch(atmJSON.audioBase64);
     const blob = await respuesta.blob();
     const arrayBuffer = await blob.arrayBuffer();
@@ -210,6 +221,8 @@ async function cargarAtmComparador(archivo) {
 inputAtmCand.addEventListener('change', async (e) => {
     if (!e.target.files[0]) return;
     try {
+        // Si había un candidato previo cargado, se libera su audio antes de
+        // reemplazarlo para no dejar memoria/objetos colgados.
         liberarAudio(comparCand?.audioEl);
 
         comparCand = await cargarAtmComparador(e.target.files[0]);
@@ -231,24 +244,87 @@ function actualizarBotonComparar() {
     );
 }
 
-// ============================================================
-// 4. COMPARACIÓN POR ARMÓNICOS (pendiente)
-// ============================================================
+// 4. COMPARACIÓN POR ARMÓNICOS (ventana deslizante + similitud coseno)
+
+// Similitud coseno entre dos espectros: mide qué tan parecida es la FORMA
+// del espectro (proporción relativa entre frecuencias), ignorando el
+// volumen absoluto. Resultado entre 0 y 1 (con datos de FFT, siempre
+// positivos). 1 = espectros idénticos en forma.
 function similitudCoseno(a, b) {
-    // Pendiente
+    let dot = 0, magA = 0, magB = 0;
+    for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        magA += a[i] * a[i];
+        magB += b[i] * b[i];
+    }
+    if (magA === 0 || magB === 0) return 0;
+    return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
+// Ventana deslizante: recorre cada posición posible donde la referencia
+// podría encajar dentro del candidato, comparando frame a frame en cada
+// posición, y se queda con la de mayor similitud promedio.
 function compararArmonicos(refFrames, candFrames, duracionCand) {
-    // Pendiente
+    const framesInput = refFrames.length;
+    const framesCand = candFrames.length;
+    const maxOffset = framesCand - framesInput;
+
+    let mejorOffset = 0;
+    let mejorScore = -Infinity;
+
+    for (let offset = 0; offset <= maxOffset; offset++) {
+        let suma = 0;
+        for (let i = 0; i < framesInput; i++) {
+            suma += similitudCoseno(refFrames[i], candFrames[offset + i]);
+        }
+        const promedio = suma / framesInput;
+        if (promedio > mejorScore) {
+            mejorScore = promedio;
+            mejorOffset = offset;
+        }
+    }
+
+    // Conversión de índice de frame a segundos: se asume que los frames
+    // están repartidos uniformemente a lo largo de la duración total del
+    // candidato (válido porque el submuestreo 1/10 es constante).
+    const segPorFrame = duracionCand / framesCand;
+    const tInicioSeg = mejorOffset * segPorFrame;
+    const ultimoFrame = Math.min(mejorOffset + framesInput - 1, framesCand - 1);
+    const tFinSeg = ultimoFrame * segPorFrame;
+
+    return {
+        offset: mejorOffset,
+        confianza: 0, //PENDIENTE
+        tInicioSeg,
+        tFinSeg,
+        framesInput
+    };
 }
 
 btnComparar.addEventListener('click', () => {
-    // Pendiente
+    comparResultado = compararArmonicos(comparRefFrames, comparCand.frames, comparCand.duracion);
+    comparTiempoMatch.textContent =
+        `${formatTiempoPreciso(comparResultado.tInicioSeg)} — ${formatTiempoPreciso(comparResultado.tFinSeg)}`;
+
+    btnPlayMatch.disabled = false;
 });
 
-// ============================================================
-// 5. REPRODUCIR EL SEGMENTO COINCIDENTE (pendiente)
-// ============================================================
+// 5. REPRODUCIR EL SEGMENTO COINCIDENTE
 btnPlayMatch.addEventListener('click', () => {
-    // Pendiente
+    if (!comparResultado || !comparCand?.audioEl) return;
+
+    const { tInicioSeg, tFinSeg } = comparResultado;
+    const audioEl = comparCand.audioEl;
+
+    audioEl.currentTime = tInicioSeg;
+    audioEl.play();
+
+    // Se detiene automáticamente al llegar al final del segmento coincidente, para que suene solo el fragmento encontrado y no el resto del audio.
+    const onTimeUpdate = () => {
+        if (audioEl.currentTime >= tFinSeg) {
+            audioEl.pause();
+            audioEl.removeEventListener('timeupdate', onTimeUpdate);
+        }
+    };
+    audioEl.addEventListener('timeupdate', onTimeUpdate);
 });
