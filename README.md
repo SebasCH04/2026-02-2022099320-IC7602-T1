@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
   <img src="Autrum/favicon.svg" alt="Autrum Logo" width="100" />
 
   # Autrum
@@ -18,12 +18,12 @@
 
 ## Integrantes
 
-- Daniel de Jesús Alemán Ruiz | 2023051957 |
-- Victor Aymerich Quesada | 2023152436 |
-- José Julián Brenes Garro | 2022272865 |
-- Sebastián Calvo Hernández | 2022099320 |
-- Emmanuel David Rodríguez Rivas | 2023146102 |
-- Sebastián Rodríguez Sánchez | 2023074446 |
+- Daniel de Jesús Alemán Ruiz | 2023051957 
+- Victor Aymerich Quesada | 2023152436 
+- José Julián Brenes Garro | 2022272865 
+- Sebastián Calvo Hernández | 2022099320 
+- Emmanuel David Rodríguez Rivas | 2023146102 
+- Sebastián Rodríguez Sánchez | 2023074446 
 
 ## Información del Curso
 
@@ -52,12 +52,14 @@
 ### Windows
 
 ```bat
+cd Autrum
 .\run.bat
 ```
 
 ### Linux / macOS
 
 ```bash
+cd Autrum
 chmod +x run.sh
 ./run.sh
 ```
@@ -82,20 +84,25 @@ La aplicación es una **Single Page Application (SPA)** construida con tecnolog�
 ## Estructura del Proyecto
 
 ```
-2026-02-2023051957-IC7602-T1/
+2026-02-2022099320-IC7602-T1/
 │
-├── index.html              # Interfaz principal (Analizador, Reproductor, Comparador)
-├── style.css               # Estilos globales (diseño oscuro moderno)
-├── favicon.svg             # Ícono de la aplicación
+├── Autrum/                 # Código fuente de la aplicación
+│   ├── index.html          # Interfaz principal (Analizador, Reproductor, Comparador)
+│   ├── style.css           # Estilos globales (diseño oscuro moderno)
+│   ├── favicon.svg         # Ícono de la aplicación
+│   ├── run.sh              # Script de automatización para Linux / macOS
+│   ├── run.bat             # Script de automatización para Windows
+│   └── js/                 # Lógica de la aplicación
+│       ├── app.js          # Controlador de navegación
+│       ├── analizador.js   # Lógica del Analizador
+│       ├── reproductor.js  # Lógica del Reproductor
+│       ├── comparador.js   # Lógica del Comparador
+│       └── visualizador.js # Lógica de dibujado de gráficas (Canvas)
 │
-├── js/
-│   ├── app.js              # Controlador de navegación entre módulos
-│   ├── analizador.js       # Lógica del Analizador (FFT, gráficas, exportación .atm)
-│   ├── reproductor.js      # Lógica del Reproductor
-│   └── comparador.js       # Lógica del Comparador
+├── Reportes/               # Reportes semanales de avance
+│   ├── T1R1.md / .pdf      # Primer reporte de avance
+│   └── T1R2.md / .pdf      # Segundo reporte de avance
 │
-├── run.sh                  # Script de automatización para Linux / macOS
-├── run.bat                 # Script de automatización para Windows
 └── README.md               # Documentación general del proyecto
 ```
 
@@ -123,3 +130,15 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 | `metadata` | Información general del archivo (nombre, fecha, conteo de muestras). |
 | `frecuencias` | Arreglo de muestras del espectro de frecuencias capturadas durante la grabación. |
 | `audioBase64` | El audio original completo codificado en Base64 para su reproducción posterior. |
+
+## Estado de Implementación
+
+A continuación se resume qué funciona y qué no funciona en la implementación actual del proyecto, de acuerdo a los requerimientos de la tarea:
+
+| Componente | Funciona | No Funciona (Observaciones) |
+|---|---|---|
+| **Autrum Analizador** | Sí |  |
+| **Autrum Comparador** | Sí |  |
+| **Autrum Reproductor** | Sí | |
+| **Documento respuestas: ¿Por qué las voces son diferentes?** | No | Aún pendiente de redacción (Tarea T-04). |
+| **Documento respuestas: ¿Por qué la comparación es poco exacta?** | No | Aún pendiente de redacción (Tarea T-04). |
