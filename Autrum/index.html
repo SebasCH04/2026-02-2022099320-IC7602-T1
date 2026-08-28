@@ -166,11 +166,25 @@
                 </div>
             </div>
 
+            <!-- Contenedor de Gráficos para el Comparador -->
+            <div class="graphs-container" id="compar-graphs-container" style="margin-bottom: 1.5rem;">
+                <div class="graph-box">
+                    <h3><i class="fas fa-microphone"></i> Referencia (Microfono)</h3>
+                    <canvas id="canvas-comparador-ref" width="600" height="150"></canvas>
+                </div>
+                <div class="graph-box">
+                    <h3><i class="fas fa-file-audio"></i> Candidato (Archivo .atm)</h3>
+                    <canvas id="canvas-comparador-cand" width="600" height="150"></canvas>
+                </div>
+            </div>
+
             <div class="export-container" style="margin-bottom: 1.5rem;">
                 <button id="btn-comparar" class="btn btn-success" disabled>
                     <i class="fas fa-magnifying-glass"></i> Comparar
                 </button>
             </div>
+
+    
 
             <div class="playback-progress">
                 <span><i class="fas fa-percent"></i> Confianza: <strong id="compar-confianza">—</strong></span>
