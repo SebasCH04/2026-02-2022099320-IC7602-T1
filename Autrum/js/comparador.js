@@ -1,4 +1,6 @@
+// ============================================================
 // AUTRUM — COMPARADOR (armonicos y potencia)
+// ============================================================
 
 const btnGrabarRef = document.getElementById('btn-grabar-ref');
 const btnDetenerRef = document.getElementById('btn-detener-ref');
@@ -15,51 +17,85 @@ const btnPlayMatch = document.getElementById('btn-play-match');
 const comparConfianza = document.getElementById('compar-confianza');
 const comparTiempoMatch = document.getElementById('compar-tiempo-match');
 
+// NUEVO: Referencias UI para los gráficos
+const comparGraphsContainer = document.getElementById('compar-graphs-container');
+const canvasComparRef = document.getElementById('canvas-comparador-ref');
+const ctxComparRef = canvasComparRef?.getContext('2d');
+const canvasComparCand = document.getElementById('canvas-comparador-cand');
+const ctxComparCand = canvasComparCand?.getContext('2d');
+
+
 // --- Estado de la referencia (mic en vivo) ---
-let comparRefFrames = [];          // muestras { timestamp, datos, potencia }, sin silencio externo
+let comparRefFrames = [];          
 let comparAudioContext = null;
 let comparAnalyser = null;
 let comparMicrophone = null;
 let comparStream = null;
 let comparGrabando = false;
 let comparAnimationId = null;
-let comparFrameCount = 0;          // contador propio para el submuestreo 1/10, igual que analizador.js
+let comparFrameCount = 0;          
 let comparRefMediaRecorder = null;
 let comparRefChunks = [];
-let comparRefAudioEl = null;       // <audio> de la referencia grabada, para reproducir
+let comparRefAudioEl = null;       
 let comparRefInicioMs = 0;
+// NUEVO: Guardar el buffer de la referencia para dibujar la onda
+let comparRefAudioBuffer = null; 
 
 // --- Estado del candidato (.atm subido) ---
-let comparCand = null;             // { nombre, frames, duracion, audioEl }
-let comparResultado = null;        // resultado combinado de armonicos y potencia
+let comparCand = null;             // { nombre, frames, duracion, audioEl, buffer }
+let comparResultado = null;        
+
+
+// NUEVO: Ajuste de canvas del comparador (similar a reproductor.js)
+function ajustarCanvasComparador() {
+    if(canvasComparRef && canvasComparCand) {
+        ajustarCanvas(canvasComparRef);
+        ajustarCanvas(canvasComparCand);
+        
+        // Redibujar si los buffers ya existen
+        if (comparRefAudioBuffer) {
+            dibujarOndaBuffer(ctxComparRef, comparRefAudioBuffer, canvasComparRef.width, canvasComparRef.height, 0, comparRefAudioBuffer.duration);
+        }
+        if (comparCand && comparCand.buffer) {
+            dibujarOndaBuffer(ctxComparCand, comparCand.buffer, canvasComparCand.width, canvasComparCand.height, 0, comparCand.duracion);
+        }
+    }
+}
+window.addEventListener('resize', ajustarCanvasComparador);
+window.addEventListener('load', ajustarCanvasComparador);
+
 
 // 0. HELPERS COMPARTIDOS DENTRO DEL MÓDULO
 
-function crearAudioDesdeBlob(blob) { // Crea un <audio> reproducible a partir de un Blob.
+function crearAudioDesdeBlob(blob) { 
     const audio = new Audio(URL.createObjectURL(blob));
     audio.preload = 'auto';
     return audio;
 }
 
-function liberarAudio(audioEl) { // Pausa y libera la URL de un <audio> creado con crearAudioDesdeBlob, si existe. 
+function liberarAudio(audioEl) {  
     if (!audioEl) return;
     audioEl.pause();
     URL.revokeObjectURL(audioEl.src);
 }
 
-function actualizarUIGrabacion(grabando) { // Habilita/deshabilita los controles relacionados con la grabación de la referencia.
+function actualizarUIGrabacion(grabando) { 
     btnGrabarRef.disabled = grabando;
     btnDetenerRef.disabled = !grabando;
 
-    if (grabando) { // Mientras se graba una nueva referencia, cualquier resultado de comparación previo deja de tener sentido.
+    if (grabando) { 
         btnPlayRef.disabled = true;
         btnComparar.disabled = true;
         btnPlayMatch.disabled = true;
+        
+        // NUEVO: Limpiar grafica de referencia al iniciar nueva grabacion
+        comparRefAudioBuffer = null;
+        if(ctxComparRef) limpiarCanvas(ctxComparRef, canvasComparRef.width, canvasComparRef.height);
     }
     refStatus.style.display = grabando ? 'flex' : 'none';
 }
 
-function formatTiempoPreciso(segundos) { // Formatea segundos como mm:ss.s (con un decimal).
+function formatTiempoPreciso(segundos) { 
     if (!isFinite(segundos) || segundos < 0) segundos = 0;
     const m = Math.floor(segundos / 60);
     const s = (segundos % 60).toFixed(1);
@@ -70,11 +106,8 @@ function clampComparador(valor, minimo = 0, maximo = 1) {
     return Math.min(Math.max(valor, minimo), maximo);
 }
 
-// Media de cuadrados de las muestras temporales (RMS^2), es la misma metrica
-// utilizada por analizador.js al crear los archivos .atm version 2
 function calcularPotenciaTemporalComparador(muestras) {
     if (!muestras.length) return 0;
-
     let sumaCuadrados = 0;
     for (const muestra of muestras) {
         sumaCuadrados += muestra * muestra;
@@ -82,11 +115,8 @@ function calcularPotenciaTemporalComparador(muestras) {
     return sumaCuadrados / muestras.length;
 }
 
-// Compatibilidad con archivos .atm antiguos que solo guardaban el espectro
-// byte. No es potencia fisica, se usa unicamente como aproximacion
 function estimarPotenciaDesdeEspectro(datos) {
     if (!datos.length) return 0;
-
     let sumaCuadrados = 0;
     for (const magnitud of datos) {
         const normalizada = magnitud / 255;
@@ -107,23 +137,39 @@ btnGrabarRef.addEventListener('click', async () => {
 
         comparStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-        // --- Análisis de frecuencia (para comparar) ---
         comparAnalyser = comparAudioContext.createAnalyser();
-        comparAnalyser.fftSize = 2048; // mismo valor que analizador.js: los espectros deben ser comparables
+        comparAnalyser.fftSize = 2048; 
         comparMicrophone = comparAudioContext.createMediaStreamSource(comparStream);
         comparMicrophone.connect(comparAnalyser);
-        // No se conecta a destination: evita feedback/eco mientras se graba
-        // --- Grabación del audio real (para poder reproducirlo después) ---
+        
         comparRefChunks = [];
         comparRefMediaRecorder = new MediaRecorder(comparStream);
         comparRefMediaRecorder.ondataavailable = (e) => {
             if (e.data.size > 0) comparRefChunks.push(e.data);
         };
-        comparRefMediaRecorder.onstop = () => {
+        
+        // NUEVO: Bloque modificado para decodificar el blob y dibujar la grafica
+        comparRefMediaRecorder.onstop = async () => {
             liberarAudio(comparRefAudioEl);
-            comparRefAudioEl = crearAudioDesdeBlob(new Blob(comparRefChunks, { type: 'audio/webm' }));
+            const blob = new Blob(comparRefChunks, { type: 'audio/webm' });
+            comparRefAudioEl = crearAudioDesdeBlob(blob);
             btnPlayRef.disabled = false;
+            
+         
+            ajustarCanvasComparador();
+            
+            // Decodificar audio para dibujarlo
+            try {
+                const arrayBuffer = await blob.arrayBuffer();
+                const ctxTemp = new (window.AudioContext || window.webkitAudioContext)();
+                comparRefAudioBuffer = await ctxTemp.decodeAudioData(arrayBuffer);
+                ctxTemp.close();
+                dibujarOndaBuffer(ctxComparRef, comparRefAudioBuffer, canvasComparRef.width, canvasComparRef.height, 0, comparRefAudioBuffer.duration);
+            } catch(e) {
+                console.error("No se pudo decodificar la referencia para graficar", e);
+            }
         };
+        
         comparRefMediaRecorder.start();
 
         comparRefFrames = [];
@@ -148,7 +194,6 @@ function capturarFramesReferencia() {
     const dataArrayFreq = new Uint8Array(bufferLength);
     comparAnalyser.getByteFrequencyData(dataArrayFreq);
 
-    // Mismo criterio de submuestreo que analizador.js: 1 de cada 10 frames de animación. 
     comparFrameCount++;
     if (comparFrameCount % 10 === 0) {
         const dataArrayPotencia = new Float32Array(comparAnalyser.fftSize);
@@ -178,7 +223,6 @@ btnDetenerRef.addEventListener('click', () => {
     }
 
     actualizarUIGrabacion(false);
-    // Se descartan los frames de silencio al inicio/fin
     const framesOriginales = comparRefFrames.length;
     comparRefFrames = recortarSilencio(comparRefFrames);
 
@@ -193,23 +237,16 @@ btnPlayRef.addEventListener('click', () => {
     comparRefAudioEl.play();
 });
 
-// 2. RECORTE DE SILENCIO
+// 2. RECORTE DE SILENCIO (Sin cambios)
 
-// Para los .atm nuevos se usa potencia temporal real, el fallback conserva
-// compatibilidad con muestras antiguas que no poseen el campo de potencia.
 function energiaFrame(frame) {
     return Number.isFinite(frame.potencia)
         ? frame.potencia
         : estimarPotenciaDesdeEspectro(frame.datos || frame);
 }
 
-// Recorta los frames de silencio al inicio y al final de la referencia,
-// dejando solo el tramo con voz real. El umbral es relativo al pico máximo
-// de ESA MISMA grabación (no un número fijo), porque el volumen absoluto
-// varía mucho según el micrófono y la persona.
 function recortarSilencio(frames, factorUmbral = 0.15) {
     if (frames.length === 0) return frames;
-
     const energias = frames.map(energiaFrame);
     const maxEnergia = Math.max(...energias);
     const umbral = maxEnergia * factorUmbral;
@@ -220,10 +257,7 @@ function recortarSilencio(frames, factorUmbral = 0.15) {
     let fin = frames.length - 1;
     while (fin > inicio && energias[fin] < umbral) fin--;
 
-    // Si toda la grabación fue "silencio" (nunca superó el umbral), se
-    // devuelve sin recortar en vez de un array vacío.
     if (inicio >= fin) return frames;
-
     return frames.slice(inicio, fin + 1);
 }
 
@@ -238,9 +272,7 @@ async function cargarAtmComparador(archivo) {
     if (!atmJSON.audioBase64) {
         throw new Error('El .atm no contiene audio ("audioBase64" ausente).');
     }
-    // Se decodifica el audio dos veces con propósitos distintos:
-    // - audioBuffer: para obtener la duración exacta (necesaria para convertir "índice de frame" a "segundos").
-    // - audioEl: elemento <audio> real, para poder reproducir con play/pause/currentTime de forma simple.
+    
     const respuesta = await fetch(atmJSON.audioBase64);
     const blob = await respuesta.blob();
     const arrayBuffer = await blob.arrayBuffer();
@@ -271,21 +303,25 @@ async function cargarAtmComparador(archivo) {
         nombre: atmJSON.metadata?.nombre || archivo.name,
         frames,
         duracion: audioBuffer.duration,
-        audioEl: crearAudioDesdeBlob(blob)
+        audioEl: crearAudioDesdeBlob(blob),
+        buffer: audioBuffer // NUEVO: Exportar el buffer para poder dibujarlo
     };
 }
 
 inputAtmCand.addEventListener('change', async (e) => {
     if (!e.target.files[0]) return;
     try {
-        // Si había un candidato previo cargado, se libera su audio antes de
-        // reemplazarlo para no dejar memoria/objetos colgados.
         liberarAudio(comparCand?.audioEl);
 
         comparCand = await cargarAtmComparador(e.target.files[0]);
         candFilename.textContent = comparCand.nombre;
         candStatus.style.display = 'flex';
         btnPlayMatch.disabled = true;
+        
+  
+        ajustarCanvasComparador();
+        dibujarOndaBuffer(ctxComparCand, comparCand.buffer, canvasComparCand.width, canvasComparCand.height, 0, comparCand.duracion);
+        
         actualizarBotonComparar();
     } catch (err) {
         console.error(err);
@@ -301,12 +337,8 @@ function actualizarBotonComparar() {
     );
 }
 
-// 4. COMPARACIÓN POR ARMÓNICOS (ventana deslizante + similitud coseno)
+// 4. COMPARACIÓN POR ARMÓNICOS (Sin cambios en algoritmos, solo UI)
 
-// Similitud coseno entre dos espectros: mide qué tan parecida es la FORMA
-// del espectro (proporción relativa entre frecuencias), ignorando el
-// volumen absoluto. Resultado entre 0 y 1 (con datos de FFT, siempre
-// positivos). 1 = espectros idénticos en forma.
 function similitudCoseno(a, b) {
     let dot = 0, magA = 0, magB = 0;
     for (let i = 0; i < a.length; i++) {
@@ -326,8 +358,6 @@ function similitudArmonicaVentana(refFrames, candFrames, offset) {
     return suma / refFrames.length;
 }
 
-// Convierte una curva de potencia a dB y la estandariza, al retirar media y
-// escala se compara la forma temporal, no el volumen absoluto del microfono
 function normalizarCurvaPotencia(frames) {
     const epsilon = 1e-12;
     const valoresDb = frames.map(frame => 10 * Math.log10(Math.max(frame.potencia, epsilon)));
@@ -370,8 +400,6 @@ function seleccionarCandidatosDistintos(resultados, cantidad, separacionMinima) 
     return seleccionados;
 }
 
-// Primero, ventana deslizante por armonicos, luego, seleccion de candidatos,
-//  despues, validacion por potencia y por ultimo calculo de confianza
 function compararDosEtapas(refFrames, candFrames, duracionCand) {
     const framesInput = refFrames.length;
     const framesCand = candFrames.length;
@@ -388,15 +416,12 @@ function compararDosEtapas(refFrames, candFrames, duracionCand) {
 
     resultadosArmonicos.sort((a, b) => b.similitudArmonica - a.similitudArmonica);
 
-    // Etapa 1, conservar varias ubicaciones armonicamente prometedoras y
-    // suficientemente separadas para evitar elegir diez offsets adyacentes.
     const candidatos = seleccionarCandidatosDistintos(
         resultadosArmonicos,
         Math.min(10, resultadosArmonicos.length),
         Math.max(1, Math.floor(framesInput / 2))
     );
 
-    // Etapa 2, comparar la curva de potencia y combinar ambos criterios.
     for (const candidato of candidatos) {
         candidato.similitudPotencia = similitudPotencia(refFrames, candFrames, candidato.offset);
         candidato.puntuacion = (0.7 * candidato.similitudArmonica) + (0.3 * candidato.similitudPotencia);
@@ -430,16 +455,43 @@ function compararDosEtapas(refFrames, candFrames, duracionCand) {
     };
 }
 
+// NUEVO: Dibujar un rectángulo resaltando la zona de coincidencia
+function resaltarCoincidencia(tInicio, tFin) {
+    if (!comparCand?.buffer || !ctxComparCand) return;
+    
+    // Redibujar la onda original limpia
+    dibujarOndaBuffer(ctxComparCand, comparCand.buffer, canvasComparCand.width, canvasComparCand.height, 0, comparCand.duracion);
+    
+    // Calcular coordenadas
+    const w = canvasComparCand.width;
+    const duracion = comparCand.duracion;
+    const xInicio = (tInicio / duracion) * w;
+    const xFin = (tFin / duracion) * w;
+    const ancho = xFin - xInicio;
+
+    // Dibujar fondo semi-transparente amarillo/naranja
+    ctxComparCand.fillStyle = 'rgba(245, 158, 11, 0.3)';
+    ctxComparCand.fillRect(xInicio, 0, ancho, canvasComparCand.height);
+    
+    // Dibujar bordes
+    ctxComparCand.strokeStyle = '#f59e0b';
+    ctxComparCand.lineWidth = 2;
+    ctxComparCand.strokeRect(xInicio, 0, ancho, canvasComparCand.height);
+}
+
 btnComparar.addEventListener('click', () => {
     comparResultado = compararDosEtapas(comparRefFrames, comparCand.frames, comparCand.duracion);
     comparConfianza.textContent = `${comparResultado.confianza.toFixed(1)}%`;
     comparTiempoMatch.textContent =
         `${formatTiempoPreciso(comparResultado.tInicioSeg)} — ${formatTiempoPreciso(comparResultado.tFinSeg)}`;
 
+    // NUEVO: Llamar a la función que pinta el cuadrito amarillo en el gráfico
+    resaltarCoincidencia(comparResultado.tInicioSeg, comparResultado.tFinSeg);
+
     btnPlayMatch.disabled = false;
 });
 
-// 5. REPRODUCIR EL SEGMENTO COINCIDENTE
+// 5. REPRODUCIR EL SEGMENTO COINCIDENTE (Sin cambios)
 btnPlayMatch.addEventListener('click', () => {
     if (!comparResultado || !comparCand?.audioEl) return;
 
@@ -449,7 +501,6 @@ btnPlayMatch.addEventListener('click', () => {
     audioEl.currentTime = tInicioSeg;
     audioEl.play();
 
-    // Se detiene automáticamente al llegar al final del segmento coincidente, para que suene solo el fragmento encontrado y no el resto del audio.
     const onTimeUpdate = () => {
         if (audioEl.currentTime >= tFinSeg) {
             audioEl.pause();
