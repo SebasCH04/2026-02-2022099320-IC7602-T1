@@ -6,6 +6,7 @@
 const seccionInitCallbacks = {
     'section-reproductor': () => typeof ajustarCanvasReproductor === 'function' && ajustarCanvasReproductor(),
     'section-analizador':  () => typeof ajustarCanvasAnalizador  === 'function' && ajustarCanvasAnalizador(),
+    'section-comparador':  () => typeof ajustarCanvasComparador  === 'function' && ajustarCanvasComparador()
 };
 
 document.addEventListener('DOMContentLoaded', () => {
