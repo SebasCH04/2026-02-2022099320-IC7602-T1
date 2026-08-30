@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Autrum - Audio Lab</title>
-    <!-- Favicon independiente con la onda cuadrada exacta -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
-    <!-- Importar FontAwesome para íconos sin necesidad de framework -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -21,12 +19,10 @@
     </header>
 
     <main id="main-content">
-        <!-- Sección del Analizador -->
         <section id="section-analizador" class="active-section">
             <h2>Analizador de Audio</h2>
             
             <div class="controls">
-                <!-- Panel de Streaming -->
                 <div class="control-group control-stream">
                     <div class="control-group-header">
                         <span class="mode-badge badge-stream"><i class="fas fa-tower-broadcast"></i> Streaming</span>
@@ -39,7 +35,6 @@
                     </div>
                 </div>
                 
-                <!-- Panel de Batch -->
                 <div class="control-group control-batch">
                     <div class="control-group-header">
                         <span class="mode-badge badge-batch"><i class="fas fa-file-audio"></i> Batch</span>
@@ -57,14 +52,13 @@
                 </div>
             </div>
 
-
             <div class="graphs-container">
                 <div class="graph-box">
                     <h3><i class="fas fa-clock"></i> Dominio del Tiempo</h3>
                     <canvas id="canvas-tiempo" width="600" height="200"></canvas>
                 </div>
                 <div class="graph-box">
-                    <h3><i class="fas fa-broadcast-tower"></i> Dominio de la Frecuencia (Fourier)</h3>
+                    <h3><i class="fas fa-broadcast-tower"></i> Dominio de la Frecuencia (en vivo)</h3>
                     <canvas id="canvas-frecuencia" width="600" height="200"></canvas>
                 </div>
             </div>
@@ -74,12 +68,10 @@
             </div>
         </section>
 
-        <!-- Sección del Reproductor (Oculta por defecto) -->
         <section id="section-reproductor" style="display: none;">
             <h2>Reproductor Autrum</h2>
 
             <div class="controls">
-                <!-- Panel de carga y transporte -->
                 <div class="control-group control-stream">
                     <div class="control-group-header">
                         <span class="mode-badge badge-stream"><i class="fas fa-file-import"></i> Archivo .atm</span>
@@ -97,24 +89,19 @@
                     </div>
                 </div>
 
-                <!-- Panel de zoom -->
-                <div class="control-group control-batch">
-                    <div class="control-group-header">
-                        <span class="mode-badge badge-batch"><i class="fas fa-magnifying-glass"></i> Zoom</span>
-                        <span class="mode-subtitle">Explore el dominio del tiempo con detalle</span>
-                    </div>
-                    <div class="btn-row">
-                        <button id="btn-zoom-in" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-plus"></i> Acercar</button>
-                        <button id="btn-zoom-out" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-minus"></i> Alejar</button>
-                        <button id="btn-zoom-reset" class="btn btn-warning" disabled><i class="fas fa-expand"></i> Ver todo</button>
-                    </div>
-                </div>
+               
             </div>
 
             <div class="graphs-container">
                 <div class="graph-box">
-                    <h3><i class="fas fa-clock"></i> Dominio del Tiempo <span class="hint-text">(click: saltar · arrastrar: desplazar)</span></h3>
+                    <h3><i class="fas fa-clock"></i> Dominio del Tiempo </h3>
                     <canvas id="canvas-reproductor-tiempo" width="600" height="200"></canvas>
+                    
+                    <div class="btn-row" style="justify-content: center; margin-top: 10px;">
+                        <button id="btn-zoom-in" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-plus"></i> Acercar</button>
+                        <button id="btn-zoom-out" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-minus"></i> Alejar</button>
+                        <button id="btn-zoom-reset" class="btn btn-warning" disabled><i class="fas fa-expand"></i> Ver todo</button>
+                    </div>
                 </div>
                 <div class="graph-box">
                     <h3><i class="fas fa-broadcast-tower"></i> Dominio de la Frecuencia (en vivo)</h3>
@@ -129,12 +116,10 @@
             </div>
         </section>
 
-        <!-- Sección del Comparador -->
         <section id="section-comparador" style="display: none;">
             <h2>Comparador de Voces</h2>
 
             <div class="controls">
-                <!-- Panel de referencia: grabación en vivo por micrófono -->
                 <div class="control-group control-stream">
                     <div class="control-group-header">
                         <span class="mode-badge badge-stream"><i class="fas fa-microphone"></i> Referencia</span>
@@ -150,7 +135,6 @@
                     </div>
                 </div>
 
-                <!-- Panel candidato: archivo .atm previamente generado -->
                 <div class="control-group control-batch">
                     <div class="control-group-header">
                         <span class="mode-badge badge-batch"><i class="fas fa-file-audio"></i> Candidato</span>
@@ -166,15 +150,43 @@
                 </div>
             </div>
 
-            <!-- Contenedor de Gráficos para el Comparador -->
-            <div class="graphs-container" id="compar-graphs-container" style="margin-bottom: 1.5rem;">
+         
+
+            <div class="graphs-container" id="compar-graphs-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <!-- Gráfico de Referencia (Tiempo) -->
                 <div class="graph-box">
-                    <h3><i class="fas fa-microphone"></i> Referencia (Microfono)</h3>
-                    <canvas id="canvas-comparador-ref" width="600" height="150"></canvas>
+                    <h3><i class="fas fa-clock"></i> Ref - Dominio del Tiempo</h3>
+                    <canvas id="canvas-comparador-ref" width="600" height="200"></canvas>
+                    
+                    <div class="btn-row" style="justify-content: center; margin-top: 10px;">
+                        <button id="btn-zoom-in-ref" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-plus"></i></button>
+                        <button id="btn-zoom-out-ref" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-minus"></i></button>
+                        <button id="btn-zoom-reset-ref" class="btn btn-warning" disabled><i class="fas fa-expand"></i></button>
+                    </div>
                 </div>
+                
+                <!-- Gráfico de Referencia (Frecuencia) -->
                 <div class="graph-box">
-                    <h3><i class="fas fa-file-audio"></i> Candidato (Archivo .atm)</h3>
-                    <canvas id="canvas-comparador-cand" width="600" height="150"></canvas>
+                    <h3><i class="fas fa-broadcast-tower"></i> Ref - Dominio de la Frecuencia (en vivo)</h3>
+                    <canvas id="canvas-comparador-ref-freq" width="600" height="200"></canvas>
+                </div>
+                
+                <!-- Gráfico de Candidato (Tiempo) -->
+                <div class="graph-box">
+                    <h3><i class="fas fa-clock"></i> Cand - Dominio del Tiempo</h3>
+                    <canvas id="canvas-comparador-cand" width="600" height="200"></canvas>
+                    
+                    <div class="btn-row" style="justify-content: center; margin-top: 10px;">
+                        <button id="btn-zoom-in-cand" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-plus"></i></button>
+                        <button id="btn-zoom-out-cand" class="btn btn-warning" disabled><i class="fas fa-magnifying-glass-minus"></i></button>
+                        <button id="btn-zoom-reset-cand" class="btn btn-warning" disabled><i class="fas fa-expand"></i></button>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Candidato (Frecuencia) -->
+                <div class="graph-box">
+                    <h3><i class="fas fa-broadcast-tower"></i> Cand - Dominio de la Frecuencia (en vivo)</h3>
+                    <canvas id="canvas-comparador-cand-freq" width="600" height="200"></canvas>
                 </div>
             </div>
 
@@ -183,8 +195,6 @@
                     <i class="fas fa-magnifying-glass"></i> Comparar
                 </button>
             </div>
-
-    
 
             <div class="playback-progress">
                 <span><i class="fas fa-percent"></i> Confianza: <strong id="compar-confianza">—</strong></span>
@@ -196,21 +206,17 @@
         </section>
     </main>
 
-    <!-- Modal de Exportación -->
     <div id="modal-exportar" class="modal-overlay" style="display: none;">
         <div class="modal-card">
             <h3><i class="fas fa-file-export"></i> Exportar Archivo .atm</h3>
             <p>Introduce un nombre para guardar tu análisis de audio:</p>
-            
             <div class="modal-input-group">
                 <input type="text" id="input-filename" value="grabacion" placeholder="Nombre del archivo">
                 <span class="file-ext">.atm</span>
             </div>
-
             <div id="modal-loading" style="display: none;" class="loading-spinner">
                 <i class="fas fa-circle-notch fa-spin"></i> Generando archivo .atm...
             </div>
-
             <div class="modal-actions">
                 <button id="btn-cancelar-export" class="btn">Cancelar</button>
                 <button id="btn-confirmar-export" class="btn btn-success"><i class="fas fa-download"></i> Guardar</button>
@@ -218,7 +224,6 @@
         </div>
     </div>
 
-    <!-- Scripts modularizados -->
     <script src="js/visualizador.js"></script>
     <script src="js/app.js"></script>
     <script src="js/analizador.js"></script>
