@@ -100,6 +100,7 @@ function clampVistaCand(inicio) {
 }
 
 function dibujarPlayhead(ctx, canvas, t, vStart, vDur) {
+    if (!canvas || !ctx) return;
     if (t < vStart || t > vStart + vDur) return;
     const x = ((t - vStart) / vDur) * canvas.width;
     ctx.strokeStyle = '#f59e0b';
