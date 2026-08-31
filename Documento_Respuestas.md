@@ -27,3 +27,15 @@ Primero el micrófono y el ambiente son un canal de transmisión que tienen limi
 Segundo, hay una variabilidad temporal en la pronunciación, porque dos personas pueden pronunciar una palabra a velocidades diferentes. Nosotros usamos compararArmonicos y esta función usa ventanas para analizar la señal, entonces los armónicos pueden quedar distribuidos en posiciones diferentes, entonces los frames no están alineados.
 
 Y por último, la similitud coseno que utilizamos compara la forma relativa de los espectros pero no corrige diferencias de tono, timbre o pequeñas diferencias de frecuencia entre personas. Entonces como la voz de cada persona tiene características propias, dos personas diciendo lo mismo puede dar espectros diferentes.
+
+Se pueden ver en el siguiente ejemplo usando la aplicación Autrum, se grabó utilizando la función Analizador para luego convertir en archivo .atm donde se dijo la frase "Que lindo ir a Alajuela"
+
+![Referencia Uno Alajuela](https://i.imgur.com/rVjfJQc.png)
+
+Está seleccionada la parte del archivo donde justo se dice "Alajuela" y si luego la misma persona graba otro audio diciendo lo mismo, va a tener una frecuencia similar.
+
+![Referencia Dos Alajuela](https://i.imgur.com/zJ5BIOS.png)
+
+Pero en cambio otra persona dijo lo mismo y se ve que que dió resultados diferentes.
+
+![Referencia Tres Alajuela](https://i.imgur.com/hmqKkOu.png)
