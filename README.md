@@ -140,5 +140,5 @@ A continuación se resume qué funciona y qué no funciona en la implementación
 | **Autrum Analizador** | Sí |  |
 | **Autrum Comparador** | Sí |  |
 | **Autrum Reproductor** | Sí | |
-| **Documento respuestas: ¿Por qué las voces son diferentes?** | No | Aún pendiente de redacción (Tarea T-04). |
-| **Documento respuestas: ¿Por qué la comparación es poco exacta?** | No | Aún pendiente de redacción (Tarea T-04). |
+| **Documento respuestas: ¿Por qué las voces son diferentes?** | Sí | Documento en .md  |
+| **Documento respuestas: ¿Por qué la comparación es poco exacta?** | Sí | Documento en .md |

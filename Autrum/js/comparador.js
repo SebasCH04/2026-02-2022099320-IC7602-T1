@@ -1,3 +1,4 @@
+// Referencias a la UI
 const btnGrabarRef = document.getElementById('btn-grabar-ref');
 const btnDetenerRef = document.getElementById('btn-detener-ref');
 const btnPlayRef = document.getElementById('btn-play-ref');
@@ -30,7 +31,8 @@ const btnZoomInCand = document.getElementById('btn-zoom-in-cand');
 const btnZoomOutCand = document.getElementById('btn-zoom-out-cand');
 const btnZoomResetCand = document.getElementById('btn-zoom-reset-cand');
 
-let comparRefFrames = [];          
+// Estado de la grabación y del análisis
+let comparRefFrames = [];
 let comparAudioContext = null;
 let comparAnalyser = null;
 let comparMicrophone = null;
@@ -59,24 +61,24 @@ let refPlayAnimId = null, candPlayAnimId = null;
 
 function ajustarCanvasComparador() {
     if(canvasComparRef && canvasComparCand) {
-        // 1. Ajustar el tamaño real de los 4 canvas
+        // Ajusta el tamaño de los 4 canvas
         ajustarCanvas(canvasComparRef);
         ajustarCanvas(canvasComparCand);
         ajustarCanvas(canvasComparRefFreq);
         ajustarCanvas(canvasComparCandFreq);
         
-        // 2. Dibujar las ondas de tiempo
+        // Dibujar las ondas de tiempo
         dibujarRefTiempo();
         dibujarCandTiempo();
         
-        // 3. Restaurar o limpiar Frecuencia de la Referencia
+        // Restaurar o limpiar Frecuencia de la Referencia
         if (comparRefFrames && comparRefFrames.length > 0) {
             dibujarEspectroFrecuencia(ctxComparRefFreq, comparRefFrames[0].datos, canvasComparRefFreq.width, canvasComparRefFreq.height);
         } else if (ctxComparRefFreq) {
             limpiarCanvas(ctxComparRefFreq, canvasComparRefFreq.width, canvasComparRefFreq.height);
         }
         
-        // 4. Restaurar o limpiar Frecuencia del Candidato
+        // Restaurar o limpiar Frecuencia del Candidato
         if (comparCand && comparCand.frames && comparCand.frames.length > 0) {
             dibujarEspectroFrecuencia(ctxComparCandFreq, comparCand.frames[0].datos, canvasComparCandFreq.width, canvasComparCandFreq.height);
         } else if (ctxComparCandFreq) {
@@ -198,13 +200,15 @@ window.addEventListener('mouseup', () => {
     draggingCand = false;
 });
 
-function crearAudioDesdeBlob(blob) { 
+// Crea un elemento de audio reproducible a partir de un blob
+function crearAudioDesdeBlob(blob) {
     const audio = new Audio(URL.createObjectURL(blob));
     audio.preload = 'auto';
     return audio;
 }
 
-function liberarAudio(audioEl) {  
+// Libera el object URL de un audio previamente creado
+function liberarAudio(audioEl) {
     if (!audioEl) return;
     audioEl.pause();
     URL.revokeObjectURL(audioEl.src);
@@ -260,6 +264,7 @@ function estimarPotenciaDesdeEspectro(datos) {
     return sumaCuadrados / datos.length;
 }
 
+// Conecta el analyser al audio de referencia, una sola vez
 function initPlayRefGraph() {
     if(!playRefCtx) {
         playRefCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -271,6 +276,7 @@ function initPlayRefGraph() {
     }
 }
 
+// Conecta el analyser al audio candidato, una sola vez
 function initPlayCandGraph() {
     if(!playCandCtx) {
         playCandCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -307,6 +313,7 @@ function animCandPlay() {
 }
 
 
+// Graba la referencia desde el micrófono
 btnGrabarRef.addEventListener('click', async () => {
     try {
         if (!comparAudioContext) comparAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -371,6 +378,7 @@ btnGrabarRef.addEventListener('click', async () => {
     }
 });
 
+// Captura frames de frecuencia y potencia mientras se graba la referencia
 function capturarFramesReferencia() {
     if (!comparGrabando) return;
     comparAnimationId = requestAnimationFrame(capturarFramesReferencia);
@@ -437,6 +445,7 @@ function energiaFrame(frame) {
         : estimarPotenciaDesdeEspectro(frame.datos || frame);
 }
 
+// Descarta los frames del inicio y del final por debajo del umbral de energía
 function recortarSilencio(frames, factorUmbral = 0.15) {
     if (frames.length === 0) return frames;
     const energias = frames.map(energiaFrame);
@@ -452,6 +461,7 @@ function recortarSilencio(frames, factorUmbral = 0.15) {
     return frames.slice(inicio, fin + 1);
 }
 
+// Lee un archivo .atm y decodifica su audio para el candidato
 async function cargarAtmComparador(archivo) {
     const texto = await archivo.text();
     const atmJSON = JSON.parse(texto);
@@ -518,6 +528,7 @@ function actualizarBotonComparar() {
     btnComparar.disabled = !(comparRefFrames.length > 0 && comparCand && comparRefFrames.length <= comparCand.frames.length);
 }
 
+// Similitud coseno entre dos espectros de frecuencia
 function similitudCoseno(a, b) {
     let dot = 0, magA = 0, magB = 0;
     for (let i = 0; i < a.length; i++) {
@@ -529,6 +540,7 @@ function similitudCoseno(a, b) {
     return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
+// Promedio de similitud coseno entre la referencia y una ventana del candidato
 function similitudArmonicaVentana(refFrames, candFrames, offset) {
     let suma = 0;
     for (let i = 0; i < refFrames.length; i++) {
@@ -537,6 +549,7 @@ function similitudArmonicaVentana(refFrames, candFrames, offset) {
     return suma / refFrames.length;
 }
 
+// Convierte la potencia de los frames a dB y la normaliza (media 0, desviación 1)
 function normalizarCurvaPotencia(frames) {
     const epsilon = 1e-12;
     const valoresDb = frames.map(frame => 10 * Math.log10(Math.max(frame.potencia, epsilon)));
@@ -548,6 +561,7 @@ function normalizarCurvaPotencia(frames) {
     return valoresDb.map(valor => (valor - media) / desviacion);
 }
 
+// Correlación entre las curvas de potencia normalizadas de referencia y candidato
 function similitudPotencia(refFrames, candFrames, offset) {
     const curvaRef = normalizarCurvaPotencia(refFrames);
     const ventanaCand = candFrames.slice(offset, offset + refFrames.length);
@@ -567,6 +581,7 @@ function similitudPotencia(refFrames, candFrames, offset) {
     return clampComparador((correlacion + 1) / 2);
 }
 
+// Elige los mejores resultados evitando offsets demasiado cercanos entre sí
 function seleccionarCandidatosDistintos(resultados, cantidad, separacionMinima) {
     const seleccionados = [];
     for (const resultado of resultados) {
@@ -577,6 +592,8 @@ function seleccionarCandidatosDistintos(resultados, cantidad, separacionMinima) 
     return seleccionados;
 }
 
+// Busca la referencia dentro del candidato: primero por similitud armónica,
+// luego afina el puntaje de los mejores candidatos con la similitud de potencia
 function compararDosEtapas(refFrames, candFrames, duracionCand) {
     const framesInput = refFrames.length;
     const framesCand = candFrames.length;
@@ -626,6 +643,7 @@ function compararDosEtapas(refFrames, candFrames, duracionCand) {
     };
 }
 
+// Dibuja la onda del candidato y resalta el tramo donde se encontró la coincidencia
 function resaltarCoincidencia(tInicio, tFin) {
     if (!comparCand?.buffer || !ctxComparCand) return;
     

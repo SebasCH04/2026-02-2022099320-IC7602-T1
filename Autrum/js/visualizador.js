@@ -1,6 +1,4 @@
-// ============================================================
 // Funciones compartidas para dibujar en los canvas
-// ============================================================
 
 const CANVAS_BG = '#0f172a'; // Color de fondo base
 

@@ -1,8 +1,4 @@
-// Manejo básico de la navegación entre pestañas.
-// Se registra un mapa de callbacks de inicialización por sección: cada módulo
-// puede necesitar re-ajustar sus canvas cuando la sección pasa de display:none
-// a display:block por primera vez (los canvas tienen offsetWidth=0 mientras
-// están ocultos y deben recalcularse al hacerse visibles).
+// Callbacks para re-ajustar los canvas de cada sección la primera vez que se muestra.
 const seccionInitCallbacks = {
     'section-reproductor': () => typeof ajustarCanvasReproductor === 'function' && ajustarCanvasReproductor(),
     'section-analizador':  () => typeof ajustarCanvasAnalizador  === 'function' && ajustarCanvasAnalizador(),
