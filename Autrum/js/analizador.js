@@ -15,9 +15,7 @@ const ctxTiempo = canvasTiempo.getContext('2d');
 const canvasFrecuencia = document.getElementById('canvas-frecuencia');
 const ctxFrecuencia = canvasFrecuencia.getContext('2d');
 
-// Se ajustan los canvas al arrancar y al cambiar el tamaño de la ventana.
-// Si no se está grabando pero hay un analizador activo, se redibuja el estado
-// actual para que la gráfica no se pierda al hacer zoom con el navegador.
+// Redibuja el estado actual si no se está grabando, para no perder la gráfica al redimensionar.
 function ajustarCanvasAnalizador() {
     ajustarCanvas(canvasTiempo);
     ajustarCanvas(canvasFrecuencia);
@@ -72,10 +70,7 @@ let atmData = {
     trazosFrecuencia: [] // Muestras { timestamp, datos, potencia }
 };
 
-// La potencia se calcula en el dominio del tiempo como la media de los
-// cuadrados de las muestras normalizadas, esta metrica equivale a RMS^2 y es
-// comparable entre el analizador y el comparador cuando ambos usan el mismo
-// fftSize y la misma API de captura.
+// Potencia como media de los cuadrados de las muestras normalizadas (equivale a RMS^2).
 function calcularPotenciaTemporalAnalizador(muestras) {
     if (!muestras.length) return 0;
 
@@ -203,7 +198,7 @@ btnDetener.addEventListener('click', () => {
 });
 
 
-// BATCH: Cargar y analizar un archivo WAV
+// Carga y analiza un archivo WAV en modo batch
 let batchSource = null; // Referencia a la fuente de audio del WAV
 
 inputWav.addEventListener('change', async (event) => {
@@ -315,7 +310,7 @@ btnCancelarWav.addEventListener('click', () => {
 });
 
 
-// MODAL Y EXPORTACIÓN DEL ARCHIVO .ATM
+// Modal y exportación del archivo .atm
 const modalExportar = document.getElementById('modal-exportar');
 const inputFilename = document.getElementById('input-filename');
 const modalLoading = document.getElementById('modal-loading');
@@ -348,7 +343,7 @@ btnConfirmarExport.addEventListener('click', () => {
 
     const nombreArchivo = (inputFilename.value.trim() || 'grabacion') + '.atm';
 
-    // Pequeño delay de 500ms para mostrar la animación de la ruletita (spinner)
+    // Retraso breve para mostrar la animación de carga
     setTimeout(() => {
         const reader = new FileReader();
         reader.readAsDataURL(atmData.audioOriginal);

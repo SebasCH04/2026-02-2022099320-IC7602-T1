@@ -1,16 +1,7 @@
-// ============================================================
-// AUTRUM — REPRODUCTOR
-// Carga un archivo .atm (generado por el Analizador), reproduce
-// el audio y sincroniza dos gráficas: forma de onda (con zoom)
-// y espectro de frecuencia en vivo mediante Web Audio API.
-//
-// NOTA: este script comparte el scope global con analizador.js
-// (no se usan módulos ES). Todos los identificadores usan el
-// prefijo "repr" para no chocar con las variables de los otros
-// módulos (audioContext, analyser, isRecording, etc.).
-// ============================================================
+// Carga un archivo .atm, reproduce el audio y sincroniza las gráficas de onda y frecuencia.
+// Comparte el scope global con analizador.js, por eso usa el prefijo "repr" en sus variables.
 
-// --- Referencias a UI ---
+// Referencias a la UI
 const inputAtm = document.getElementById('input-atm');
 const atmStatus = document.getElementById('atm-status');
 const atmFilename = document.getElementById('atm-filename');
@@ -33,11 +24,11 @@ const ctxReprTiempo = canvasReprTiempo.getContext('2d');
 const canvasReprFrecuencia = document.getElementById('canvas-reproductor-frecuencia');
 const ctxReprFrecuencia = canvasReprFrecuencia.getContext('2d');
 
-// --- Elemento de audio real (controla reproducción/pausa/seek nativo) ---
+// Elemento de audio real, controla reproducción, pausa y seek nativo
 const reprAudioEl = new Audio();
 reprAudioEl.preload = 'auto';
 
-// --- Estado del Reproductor ---
+// Estado del reproductor
 let reprAudioContext = null;
 let reprAnalyser = null;
 let reprGraphConectado = false; // createMediaElementSource solo puede llamarse una vez por <audio>
@@ -53,10 +44,7 @@ let reprMoved = false;
 let reprViewStart = 0;    // segundos
 let reprViewDuration = 0; // segundos visibles en pantalla
 
-// Se ajustan los canvas al arrancar y al cambiar el tamaño de la ventana.
-// Si hay un buffer cargado se vuelve a dibujar la onda.
-// Para la frecuencia, se lee el estado actual del analizador para no perder 
-// la gráfica si está en pausa.
+// Redibuja la onda y, si está en pausa, el último estado del espectro de frecuencia.
 function ajustarCanvasReproductor() {
     ajustarCanvas(canvasReprTiempo);
     ajustarCanvas(canvasReprFrecuencia);
@@ -81,9 +69,7 @@ function formatTime(segundos) {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-// ============================================================
-// 1. CARGA DEL ARCHIVO .ATM
-// ============================================================
+// Carga del archivo .atm
 inputAtm.addEventListener('change', async (event) => {
     const archivo = event.target.files[0];
     if (!archivo) return;
@@ -157,10 +143,7 @@ inputAtm.addEventListener('change', async (event) => {
     }
 });
 
-// ============================================================
-// 2. CONTROLES DE REPRODUCCIÓN
-// ============================================================
-
+// Controles de reproducción
 function conectarGrafoDeAudio() {
     if (reprGraphConectado) return;
     reprAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -236,10 +219,7 @@ seekBar.addEventListener('input', () => {
     if (!reprIsPlaying) dibujarOnda();
 });
 
-// ============================================================
-// 3. DOMINIO DEL TIEMPO — forma de onda estática + zoom
-// ============================================================
-
+// Dominio del tiempo: forma de onda estática y zoom
 function dibujarOnda() {
     const w = canvasReprTiempo.width;
     const h = canvasReprTiempo.height;
@@ -250,10 +230,11 @@ function dibujarOnda() {
     }
 
     dibujarOndaBuffer(ctxReprTiempo, reprAudioBuffer, w, h, reprViewStart, reprViewDuration);
-    dibujarPlayhead();
+    dibujarPlayheadRepr();
 }
 
-function dibujarPlayhead() {
+// Nombre con prefijo "repr" para no chocar con dibujarPlayhead() de comparador.js
+function dibujarPlayheadRepr() {
     if (!reprAudioBuffer) return;
     const t = reprAudioEl.currentTime;
     if (t < reprViewStart || t > reprViewStart + reprViewDuration) return; // fuera de la vista actual
@@ -270,7 +251,7 @@ function dibujarPlayhead() {
     ctxReprTiempo.stroke();
 }
 
-// --- Zoom in / out / reset ---
+// Zoom in, zoom out y reset
 btnZoomIn.addEventListener('click', () => {
     const centro = reprAudioEl.currentTime;
     reprViewDuration = Math.max(0.2, reprViewDuration / 2);
@@ -297,7 +278,7 @@ function clampVista(inicio) {
     return Math.min(Math.max(0, inicio), maxInicio);
 }
 
-// --- Interacción con el canvas: click para saltar, arrastrar para desplazar ---
+// Interacción con el canvas: click para saltar, arrastrar para desplazar
 canvasReprTiempo.addEventListener('mousedown', (e) => {
     if (!reprAudioBuffer) return;
     reprDragging = true;
@@ -329,10 +310,7 @@ window.addEventListener('mouseup', (e) => {
     }
 });
 
-// ============================================================
-// 4. DOMINIO DE LA FRECUENCIA — espectro en vivo durante playback
-// ============================================================
-
+// Dominio de la frecuencia: espectro en vivo durante la reproducción
 function limpiarFrecuenciRepr() {
     limpiarCanvas(ctxReprFrecuencia, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 }
@@ -345,9 +323,7 @@ function dibujarFrecuencia() {
     dibujarEspectroFrecuencia(ctxReprFrecuencia, datos, canvasReprFrecuencia.width, canvasReprFrecuencia.height);
 }
 
-// ============================================================
-// 5. BUCLE PRINCIPAL DE ANIMACIÓN (mientras reproduce)
-// ============================================================
+// Bucle principal de animación mientras reproduce
 function bucleDeAnimacion() {
     if (!reprIsPlaying) return;
     reprAnimationId = requestAnimationFrame(bucleDeAnimacion);
