@@ -17,6 +17,21 @@
 
 ## Pregunta 1: ¿Por qué las voces de los integrantes son diferentes?
 
+Cada persona tiene cuerdas vocales de distinto tamaño y grosor, y eso hace que vibren a
+un tono base distinto (más agudo o más grave). Ese tono luego pasa por la garganta, la boca
+y la nariz, que actúan como una especie de caja de resonancia y refuerzan unas frecuencias
+más que otras dependiendo de su forma. Como esa forma es distinta en cada persona, el
+resultado también lo es, aunque dos personas digan exactamente la misma palabra.
+
+Con el Analizador esto se puede ver directamente: al grabar la misma palabra con dos
+integrantes distintos, la gráfica de frecuencia muestra el primer pico (el tono base) en una
+posición distinta para cada uno, y el resto de las barras también tienen una forma diferente.
+Esa diferencia en el gráfico es, básicamente, lo que hace que dos voces suenen distinto aunque
+digan lo mismo.
+
+Esto se puede ver en las capturas de la Pregunta 2 más abajo: la "Referencia Uno" y la
+"Referencia Tres" corresponden a dos integrantes distintos diciendo la misma palabra
+("Alajuela"), y sus espectros de frecuencia son distintos entre sí.
 
 ## Pregunta 2: ¿Por qué la comparación de voces es tan poco exacta mediante armónicos?
 

@@ -131,14 +131,68 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 | `frecuencias` | Arreglo de muestras del espectro de frecuencias capturadas durante la grabación. |
 | `audioBase64` | El audio original completo codificado en Base64 para su reproducción posterior. |
 
+---
+
+## Conclusiones y Recomendaciones
+
+### Conclusiones
+
+- Implementar el Analizador, el Reproductor y el Comparador directamente sobre la Web Audio API (`AnalyserNode`, `AudioContext`, `decodeAudioData`) evitó dependencias externas para el cálculo de la FFT, ya que el navegador la resuelve internamente.
+- Centralizar las funciones de dibujo en canvas (`js/visualizador.js`) redujo la duplicación entre los tres módulos, que comparten la misma lógica de graficar ondas y espectros.
+- Trabajar sin módulos ES (scripts clásicos compartiendo el mismo `window`) exige disciplina de nombres entre los cuatro archivos de lógica (`analizador.js`, `reproductor.js`, `comparador.js`, `app.js`); varias colisiones de variables tuvieron que resolverse durante el desarrollo.
+- El formato propietario `.atm` permitió desacoplar la grabación (Analizador) de la reproducción (Reproductor) y de la comparación (Comparador), de forma que los tres módulos evolucionaron con relativa independencia.
+- La comparación por armónicos crudos (sin normalizar tiempo ni amplitud) es, por diseño, un método aproximado — los resultados de confianza varían más de lo esperado incluso entre grabaciones de la misma persona, como se documenta en el Documento de Respuestas.
+
+### Recomendaciones
+
+- Ejecutar el flujo completo (Analizador → exportar `.atm` → Reproductor / Comparador) con audios grabados por **cada integrante**, no solo por quien implementó cada módulo — es la única forma de detectar bugs de integración real.
+- Probar la aplicación en Chrome, Firefox y Safari antes de la entrega, dado que `MediaRecorder` y sus códecs de salida varían entre navegadores.
+- Mantener sincronizados los reportes semanales con el estado real del código.
+- Alojar las imágenes del Documento de Respuestas dentro del repositorio (por ejemplo en `Documentacion/img/`) en lugar de un host externo como Imgur, para no depender de un enlace que puede caerse antes de la revisión.
+
+## Guía de Uso
+
+### Módulo Analizador
+
+**Modo streaming (micrófono):**
+1. En la pestaña **Analizador**, panel "Streaming", hacé clic en **Iniciar**. El navegador va a pedir permiso de micrófono.
+2. Hablá o reproducí un sonido cerca del micrófono. La gráfica izquierda (dominio del tiempo) y la derecha (dominio de la frecuencia) se actualizan en vivo.
+3. **Pausar** congela la captura sin perderla; **Continuar** la retoma.
+4. **Finalizar** detiene la grabación y habilita **Exportar archivo .atm**.
+5. Al exportar, se pide un nombre de archivo y se descarga un `.atm` con el audio y las muestras de frecuencia capturadas.
+
+**Modo batch (archivo WAV):**
+1. Hacé clic en **Cargar WAV** y seleccioná un `.wav`.
+2. El archivo se reproduce mientras se analiza; podés **Pausar/Reanudar** o **Cancelar**.
+3. Al terminar (o cancelar), se habilita la exportación a `.atm`.
+
+> Mientras un modo está activo, el otro se deshabilita para evitar mezclar dos fuentes de audio en la misma sesión.
+
+### Módulo Reproductor
+
+1. En la pestaña **Reproductor**, hacé clic en **Cargar .atm** y seleccioná un archivo generado por el Analizador.
+2. Se muestra el nombre, la cantidad de muestras de frecuencia y la duración total; la forma de onda completa se dibuja en la gráfica del dominio del tiempo.
+3. **Reproducir / Pausar / Detener** controlan la reproducción del audio embebido.
+4. Mientras suena, el espectro de frecuencia se dibuja en vivo y una línea (playhead) marca la posición actual sobre la onda.
+5. **Acercar / Alejar / Ver todo** hacen zoom sobre la onda. También podés hacer clic para saltar a un punto, o arrastrar para desplazarte.
+6. La barra de progreso inferior permite saltar (seek) manualmente.
+
+### Módulo Comparador
+
+1. En la pestaña **Comparador**, panel "Referencia": hacé clic en **Grabar referencia** y pronunciá la palabra o frase que querés buscar. **Detener** cuando termines. Podés escucharla de nuevo con **Reproducir referencia**.
+2. En el panel "Candidato": hacé clic en **Cargar .atm** y seleccioná el archivo (generado con el Analizador) donde se quiere buscar esa palabra o frase.
+3. Hacé clic en **Comparar**. El sistema ejecuta dos etapas: comparación por armónicos y comparación por potencia, y devuelve un porcentaje de confianza (0–100%) junto con el punto del audio candidato donde se encontró la mejor coincidencia.
+4. Con **Reproducir coincidencia** se reproduce el audio candidato desde ese punto exacto.
+5. Las gráficas de referencia y candidato admiten el mismo zoom/navegación que el Reproductor.
+
+---
+
 ## Estado de Implementación
 
 A continuación se resume qué funciona y qué no funciona en la implementación actual del proyecto, de acuerdo a los requerimientos de la tarea:
 
-| Componente | Funciona | No Funciona (Observaciones) |
-|---|---|---|
-| **Autrum Analizador** | Sí |  |
-| **Autrum Comparador** | Sí |  |
-| **Autrum Reproductor** | Sí | |
-| **Documento respuestas: ¿Por qué las voces son diferentes?** | Sí | Documento en .md  |
-| **Documento respuestas: ¿Por qué la comparación es poco exacta?** | Sí | Documento en .md |
+| Componente | Funciona
+|---|---|
+| **Autrum Analizador** | SI
+| **Autrum Comparador** | SI
+| **Autrum Reproductor** | SI 
