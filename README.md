@@ -226,3 +226,9 @@ A continuación se resume qué funciona y qué no funciona en la implementación
 | **Autrum Reproductor** | Sí | — |
 | **Documento: ¿Por qué las voces de los integrantes son diferentes?** | Sí | Incluido en `Documento_Respuestas.md`. |
 | **Documento: ¿Por qué la comparación de voces es tan poco exacta mediante armónicos?** | Sí | Incluido en `Documento_Respuestas.md`. |
+
+---
+
+## Video demostrativo
+
+https://drive.google.com/file/d/1oNBxzz2v3sZUxbLUFQB3pp_i9R_F0D9M/view?pli=1
