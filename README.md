@@ -39,7 +39,7 @@
 
 - **Analizador:** Captura audio en vivo (micrófono) o en lote (archivos WAV). Aplica la Transformada de Fourier mediante la Web Audio API (`AnalyserNode`) y muestra las gráficas del dominio del tiempo y la frecuencia en tiempo real. Permite exportar la sesión como un archivo `.atm`.
 - **Reproductor:** Carga un archivo `.atm` previamente generado, reproduce el audio sincronizado con sus gráficas espectrales y permite hacer zoom para explorar detalles de la señal.
-- **Comparador:** Compara dos señales de audio cargadas como archivos `.atm` analizando sus armónicos y potencias, y retorna un porcentaje de similitud (0% - 100%).
+- **Comparador:** Recibe un archivo `.atm` candidato y una palabra o frase pronunciada por micrófono. Busca la referencia dentro del candidato mediante comparación de armónicos y potencia, muestra su ubicación, reproduce el segmento encontrado y devuelve un nivel de confianza estimado entre 0% y 100%.
 
 ---
 
@@ -101,8 +101,10 @@ La aplicación es una **Single Page Application (SPA)** construida con tecnolog�
 │
 ├── Reportes/               # Reportes semanales de avance
 │   ├── T1R1.md / .pdf      # Primer reporte de avance
-│   └── T1R2.md / .pdf      # Segundo reporte de avance
+│   ├── T1R2.md / .pdf      # Segundo reporte de avance
+│   └── T1R3.md / .pdf      # Tercer reporte de avance
 │
+├── Documento_Respuestas.md # Respuestas teóricas solicitadas
 └── README.md               # Documentación general del proyecto
 ```
 
@@ -115,11 +117,23 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
   "metadata": {
     "nombre": "mi_grabacion.atm",
     "fecha": "2026-08-12T19:00:00.000Z",
-    "muestrasFrecuencia": 142
+    "muestrasFrecuencia": 142,
+    "versionFormato": 2,
+    "fftSize": 2048,
+    "sampleRate": 48000,
+    "metricaPotencia": "media-cuadratica-dominio-tiempo"
   },
   "frecuencias": [
-    [0, 15, 120, 80, 45],
-    [2, 45, 200, 95, 30]
+    {
+      "timestamp": 0.17,
+      "datos": [0, 15, 120, 80, 45],
+      "potencia": 0.00142
+    },
+    {
+      "timestamp": 0.34,
+      "datos": [2, 45, 200, 95, 30],
+      "potencia": 0.00318
+    }
   ],
   "audioBase64": "data:audio/webm;base64,GkXfo59C..."
 }
@@ -127,9 +141,23 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 
 | Campo | Descripción |
 |---|---|
-| `metadata` | Información general del archivo (nombre, fecha, conteo de muestras). |
-| `frecuencias` | Arreglo de muestras del espectro de frecuencias capturadas durante la grabación. |
+| `metadata` | Nombre, fecha, cantidad de muestras, versión del formato y configuración de análisis. |
+| `frecuencias` | Arreglo de frames capturados durante el análisis. |
+| `frecuencias[].timestamp` | Instante del frame en segundos desde el inicio del audio, sin contar las pausas. |
+| `frecuencias[].datos` | Magnitudes del espectro entregadas por `getByteFrequencyData()`. |
+| `frecuencias[].potencia` | Media de los cuadrados de las muestras temporales (`RMS²`) obtenidas con `getFloatTimeDomainData()`. |
 | `audioBase64` | El audio original completo codificado en Base64 para su reproducción posterior. |
+
+El Comparador conserva compatibilidad con archivos `.atm` de la primera versión, en los que `frecuencias` contenía solamente arreglos de magnitudes. Para esos archivos estima una potencia relativa a partir del espectro y distribuye los timestamps uniformemente a lo largo del audio, por lo que el resultado puede ser menos preciso que con la versión 2.
+
+### Comparación en dos etapas
+
+1. Se recorta el silencio externo de la referencia capturada por micrófono.
+2. Una ventana deslizante compara cada posible ubicación del candidato mediante similitud coseno entre sus espectros.
+3. Se conservan hasta diez candidatos armónicamente prometedores y suficientemente separados.
+4. Las curvas de potencia se convierten a decibelios y se normalizan para reducir el efecto del volumen absoluto.
+5. La puntuación final combina 70% de similitud armónica y 30% de similitud de potencia.
+6. El nivel de confianza estimado considera la puntuación ganadora y su separación respecto del segundo candidato. No representa una probabilidad estadística exacta.
 
 ---
 
@@ -141,7 +169,7 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 - Centralizar las funciones de dibujo en canvas (`js/visualizador.js`) redujo la duplicación entre los tres módulos, que comparten la misma lógica de graficar ondas y espectros.
 - Trabajar sin módulos ES (scripts clásicos compartiendo el mismo `window`) exige disciplina de nombres entre los cuatro archivos de lógica (`analizador.js`, `reproductor.js`, `comparador.js`, `app.js`); varias colisiones de variables tuvieron que resolverse durante el desarrollo.
 - El formato propietario `.atm` permitió desacoplar la grabación (Analizador) de la reproducción (Reproductor) y de la comparación (Comparador), de forma que los tres módulos evolucionaron con relativa independencia.
-- La comparación por armónicos crudos (sin normalizar tiempo ni amplitud) es, por diseño, un método aproximado — los resultados de confianza varían más de lo esperado incluso entre grabaciones de la misma persona, como se documenta en el Documento de Respuestas.
+- La comparación frame a frame mediante similitud coseno y potencia normalizada es, por diseño, un método aproximado: no corrige completamente cambios en velocidad de pronunciación, tono, timbre, micrófono o ruido, por lo que la confianza puede variar incluso entre grabaciones de una misma persona.
 
 ### Recomendaciones
 
@@ -164,7 +192,7 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 **Modo batch (archivo WAV):**
 1. Hacé clic en **Cargar WAV** y seleccioná un `.wav`.
 2. El archivo se reproduce mientras se analiza; podés **Pausar/Reanudar** o **Cancelar**.
-3. Al terminar (o cancelar), se habilita la exportación a `.atm`.
+3. Al terminar de forma natural se habilita la exportación a `.atm`. **Cancelar** detiene el procesamiento actual sin habilitar su exportación.
 
 > Mientras un modo está activo, el otro se deshabilita para evitar mezclar dos fuentes de audio en la misma sesión.
 
@@ -181,8 +209,8 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 
 1. En la pestaña **Comparador**, panel "Referencia": hacé clic en **Grabar referencia** y pronunciá la palabra o frase que querés buscar. **Detener** cuando termines. Podés escucharla de nuevo con **Reproducir referencia**.
 2. En el panel "Candidato": hacé clic en **Cargar .atm** y seleccioná el archivo (generado con el Analizador) donde se quiere buscar esa palabra o frase.
-3. Hacé clic en **Comparar**. El sistema ejecuta dos etapas: comparación por armónicos y comparación por potencia, y devuelve un porcentaje de confianza (0–100%) junto con el punto del audio candidato donde se encontró la mejor coincidencia.
-4. Con **Reproducir coincidencia** se reproduce el audio candidato desde ese punto exacto.
+3. Hacé clic en **Comparar**. El sistema ejecuta dos etapas: comparación por armónicos y comparación por potencia, y devuelve un nivel de confianza estimado (0–100%) junto con el intervalo del audio candidato donde encontró la mejor coincidencia.
+4. Con **Reproducir coincidencia** se reproduce únicamente el segmento encontrado.
 5. Las gráficas de referencia y candidato admiten el mismo zoom/navegación que el Reproductor.
 
 ---
@@ -191,8 +219,10 @@ El archivo `.atm` es el formato propietario de Autrum. Internamente es un objeto
 
 A continuación se resume qué funciona y qué no funciona en la implementación actual del proyecto, de acuerdo a los requerimientos de la tarea:
 
-| Componente | Funciona
-|---|---|
-| **Autrum Analizador** | SI
-| **Autrum Comparador** | SI
-| **Autrum Reproductor** | SI 
+| Aspecto | Funciona | No funciona / Observaciones |
+|---|---|---|
+| **Autrum Analizador** | Sí | — |
+| **Autrum Comparador** | Sí | La ubicación y la confianza son aproximadas y pueden variar por voz, velocidad, micrófono y ruido. |
+| **Autrum Reproductor** | Sí | — |
+| **Documento: ¿Por qué las voces de los integrantes son diferentes?** | Sí | Incluido en `Documento_Respuestas.md`. |
+| **Documento: ¿Por qué la comparación de voces es tan poco exacta mediante armónicos?** | Sí | Incluido en `Documento_Respuestas.md`. |

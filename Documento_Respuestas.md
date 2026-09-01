@@ -39,7 +39,7 @@ La comparación por armónicos no es tan exacta porque hay varios factores que p
 
 Primero el micrófono y el ambiente son un canal de transmisión que tienen limitaciones, porque el micrófono no capta del todo las frecuencias tales como son y a eso se suma la señal, por eso cuando escuchamos nuestra grabación no nos gusta porque es una grabación de media a baja calidad. Por lo que suele afectar la comparación de los armónicos.
 
-Segundo, hay una variabilidad temporal en la pronunciación, porque dos personas pueden pronunciar una palabra a velocidades diferentes. Nosotros usamos compararArmonicos y esta función usa ventanas para analizar la señal, entonces los armónicos pueden quedar distribuidos en posiciones diferentes, entonces los frames no están alineados.
+Segundo, hay variabilidad temporal en la pronunciación, porque dos personas pueden pronunciar una palabra a velocidades diferentes. La función `compararDosEtapas` usa una ventana deslizante para analizar la señal, pero no estira ni comprime temporalmente las grabaciones. Por eso los armónicos pueden quedar distribuidos en frames diferentes y perder alineación.
 
 Y por último, la similitud coseno que utilizamos compara la forma relativa de los espectros pero no corrige diferencias de tono, timbre o pequeñas diferencias de frecuencia entre personas. Entonces como la voz de cada persona tiene características propias, dos personas diciendo lo mismo puede dar espectros diferentes.
 
@@ -51,6 +51,10 @@ Está seleccionada la parte del archivo donde justo se dice "Alajuela" y si lueg
 
 ![Referencia Dos Alajuela](https://i.imgur.com/zJ5BIOS.png)
 
-Pero en cambio otra persona dijo lo mismo y se ve que que dió resultados diferentes.
+En cambio, cuando otra persona pronunció lo mismo, se obtuvieron resultados diferentes.
 
 ![Referencia Tres Alajuela](https://i.imgur.com/hmqKkOu.png)
+
+## Referencias
+
+Tanenbaum, A. S. *Computer Networks*, 4.ª edición, capítulo 2: bases teóricas para la comunicación de datos, medios de transmisión guiados y medios de transmisión inalámbrica.
